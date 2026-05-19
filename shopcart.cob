@@ -40,12 +40,12 @@
              10 SC-PRODUCT PIC X(35).
              10 SC-PRICE PIC 9(3)V99.
       * Display variants of the catalogue     
-           05 SHOP-CAT OCCURS 40 TIMES.
+           05 SHOP-CATALOGUE-DISPLAY OCCURS 40 TIMES.
              10 SCD-CODE PIC ZZZZ.
              10 SCD-PRODUCT PIC X(35).
              10 SCD-PRICE PIC ZZZZ.99.
       * Variables for the catalogue headers   
-           05 CAT-HEADERS.
+           05 CATALOGUE-HEADERS.
              10 CH-CODE PIC X(4) VALUE "CODE".
              10 CH-PRODUCT PIC X(35) VALUE "PRODUCT NAME".
              10 CH-PRICE PIC X(7) VALUE "$ PRICE".
@@ -53,8 +53,6 @@
        PROCEDURE DIVISION.
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
-           PERFORM BUILD-DISPLAY-CAT
-           PERFORM DISPLAY-CAT-HEADER
            PERFORM DISPLAY-CAT
       
            STOP RUN.
@@ -78,15 +76,7 @@
            CLOSE CSV-FILE.
        END-BUILD-CAT.
 
-       BUILD-DISPLAY-CAT.
-           MOVE 0 TO WS-SC-CODE
-           PERFORM UNTIL WS-SC-CODE IS EQUAL 40
-             ADD 1 TO WS-SC-CODE
-             MOVE SC-CODE(WS-SC-CODE) TO SCD-CODE(WS-SC-CODE)
-             MOVE SC-PRICE(WS-SC-CODE) TO SCD-PRICE(WS-SC-CODE)
-             MOVE SC-PRODUCT(WS-SC-CODE) TO SCD-PRODUCT(WS-SC-CODE)
-           END-PERFORM.
-       END-BUILD-DISPLAY-CAT.
+      
 
       * Testing that the catalogue has been created and can be displayed
        TEST-DISPLAY-CAT.
@@ -102,7 +92,12 @@
        END-TEST-DISPLAY-CAT.
 
       * Display the catalogue in two alternating columns
+      * This uses the display catalogue rather than the processing
+      * catalogue.  This is going to get confusing rather quickly hence
+      * why databases would be more suited for this type of thing
        DISPLAY-CAT.
+           PERFORM BUILD-DISPLAY-CAT
+           PERFORM DISPLAY-CAT-HEADER
            MOVE 0 TO WS-SC-CODE
            MOVE 0 TO WS-COLS
            PERFORM UNTIL WS-SC-CODE IS EQUAL 40
@@ -124,6 +119,8 @@
            END-PERFORM.
        END-DISPLAY-CAT.
 
+      * This is the header for the catalogue.  It has been simplified
+      * from the original as it is pretty obvious what is going on
        DISPLAY-CAT-HEADER.
            MOVE 0 TO WS-COLS
            MOVE 0 TO WS-SC-CODE
@@ -145,3 +142,15 @@
              END-IF
            END-PERFORM.
        END-DISPLAY-CAT-HEADER.
+
+      * Because of the way COBOL stores data, it is necessary to
+      * create a separate display function for the catalogue
+       BUILD-DISPLAY-CAT.
+           MOVE 0 TO WS-SC-CODE
+           PERFORM UNTIL WS-SC-CODE IS EQUAL 40
+             ADD 1 TO WS-SC-CODE
+             MOVE SC-CODE(WS-SC-CODE) TO SCD-CODE(WS-SC-CODE)
+             MOVE SC-PRICE(WS-SC-CODE) TO SCD-PRICE(WS-SC-CODE)
+             MOVE SC-PRODUCT(WS-SC-CODE) TO SCD-PRODUCT(WS-SC-CODE)
+           END-PERFORM.
+       END-BUILD-DISPLAY-CAT.
