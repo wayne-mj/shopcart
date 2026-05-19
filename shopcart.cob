@@ -33,11 +33,14 @@
              10 SC-PRICE PIC 9(3)V99.
 
        PROCEDURE DIVISION.
-           PERFORM READ-CSV
+      * Build the catalogue from the CSV File
+           PERFORM BUILD-CAT
+           PERFORM TEST-DISPLAY-CAT
+      
            STOP RUN.
 
       * Build catalogue from CSV file
-       READ-CSV.
+       BUILD-CAT.
            OPEN INPUT CSV-FILE.
            PERFORM UNTIL WS-EOF='Y'
              READ CSV-FILE
@@ -50,11 +53,20 @@
                    INTO     
                      SC-PRODUCT(WS-SC-CODE)
                      SC-PRICE(WS-SC-CODE)
-
-                DISPLAY SC-CODE(WS-SC-CODE) " " SC-PRODUCT(WS-SC-CODE)
-                  " " SC-PRICE(WS-SC-CODE)
-                       
              END-READ
            END-PERFORM
            CLOSE CSV-FILE.
-       END-READ-CSV.
+       END-BUILD-CAT.
+
+      * Testing that the catalogue has been created and can be displayed
+       TEST-DISPLAY-CAT.
+      * Reset the counter to 0 to
+           MOVE 0 TO WS-SC-CODE
+      * Iterate through table   
+           PERFORM UNTIL WS-SC-CODE IS EQUAL 40
+             ADD 1 TO WS-SC-CODE
+             DISPLAY SC-CODE(WS-SC-CODE) " "
+                     SC-PRODUCT(WS-SC-CODE) " "
+                     SC-PRICE(WS-SC-CODE)
+           END-PERFORM.
+       END-TEST-DISPLAY-CAT.
