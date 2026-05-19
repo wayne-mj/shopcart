@@ -2,18 +2,22 @@
       * Because many of the features of modern programming languages
       * are not present in COBOL this is going to be a challenge.
        IDENTIFICATION DIVISION.
-       PROGRAM-ID.     SHOPCART.
+       PROGRAM-ID.     SHOP-CART.
        AUTHOR.         WAYNE JACKSON.
 
        ENVIRONMENT DIVISION.
        INPUT-OUTPUT SECTION.
+      * Define the file name and set it as a sequential file with each
+      * line being beneath the previous.
        FILE-CONTROL.
            SELECT CSV-FILE ASSIGN TO "product.csv"
              ORGANIZATION IS LINE SEQUENTIAL.
 
        DATA DIVISION.
        FILE SECTION.
+      * File descriptor for CSV file
        FD  CSV-FILE.
+      * Each line should be no longer that 80 characters long
        01 CSV-RECORD PIC X(80).
        
        WORKING-STORAGE SECTION.
@@ -21,10 +25,14 @@
       * Read from CSV File 
        01 WS-EOF PIC X(1) VALUE 'N'.
       ******************************************************************
+      * Gap between columns
+       01 WS-GAP PIC X(4) VALUE SPACES.
       * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
       * This is the index for the array/table
-           05 WS-SC-CODE PIC 9(2) VALUE 0.
+           05 WS-SC-CODE   PIC 9(2) VALUE 0.
+      * Column count for table view of catalogue   
+           05 WS-COLS      PIC 9(1) VALUE 0.
       * This is the array/table for the catalogue.  It does not work the
       * the same as other programming languages.
            05 SHOP-CATALOGUE OCCURS 40 TIMES.
@@ -35,7 +43,7 @@
        PROCEDURE DIVISION.
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
-           PERFORM TEST-DISPLAY-CAT
+           PERFORM DISPLAY-CAT
       
            STOP RUN.
 
@@ -70,3 +78,25 @@
                      SC-PRICE(WS-SC-CODE)
            END-PERFORM.
        END-TEST-DISPLAY-CAT.
+
+       DISPLAY-CAT.
+           MOVE 0 TO WS-SC-CODE
+           MOVE 0 TO WS-COLS
+           PERFORM UNTIL WS-SC-CODE IS EQUAL 40
+             ADD 1 TO WS-SC-CODE
+             IF WS-COLS EQUAL 0 THEN
+               DISPLAY SC-CODE(WS-SC-CODE) WS-GAP
+                       SC-PRODUCT(WS-SC-CODE) WS-GAP
+                       SC-PRICE(WS-SC-CODE) WS-GAP 
+                       WITH NO ADVANCING
+             ELSE
+               DISPLAY SC-CODE(WS-SC-CODE) WS-GAP
+                       SC-PRODUCT(WS-SC-CODE) WS-GAP
+                       SC-PRICE(WS-SC-CODE) WS-GAP
+             END-IF
+             ADD 1 TO WS-COLS
+             IF WS-COLS EQUAL 2 THEN
+               MOVE 0 TO WS-COLS
+             END-IF
+           END-PERFORM.
+       END-DISPLAY-CAT.
