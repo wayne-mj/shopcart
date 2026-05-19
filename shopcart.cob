@@ -17,12 +17,15 @@
        01 CSV-RECORD PIC X(80).
        
        WORKING-STORAGE SECTION.
+      ******************************************************************
+      * Read from CSV File 
        01 WS-EOF PIC X(1) VALUE 'N'.
        01 WS-COL1 PIC X(35).
        01 WS-COL2 PIC 9(3)V99.
        01 WS-COMMA-POS PIC 99.
-      ************************************************************************* 
+      ******************************************************************
        01 HOMEWARECITY-STORAGE.
+           05 WS-SC-CODE PIC 9(2) VALUE 0.
            05 SHOP-CATALOGUE OCCURS 40 TIMES.
              10 SC-CODE PIC 9(2).
              10 SC-PRODUCT PIC X(35).
@@ -38,11 +41,18 @@
                READ CSV-FILE
                    AT END MOVE 'Y' TO WS-EOF
                    NOT AT END
+                       ADD 1 TO WS-SC-CODE
+                       MOVE WS-SC-CODE TO SC-CODE(WS-SC-CODE)
                        UNSTRING CSV-RECORD
                            DELIMITED BY ','
-                           INTO WS-COL1
-                                WS-COL2
-                DISPLAY WS-COL1 " - " WS-COL2
+                           INTO SC-PRODUCT(WS-SC-CODE)
+                           SC-PRICE(WS-SC-CODE)
+                    
+      *                    INTO WS-COL1
+      *                         WS-COL2
+                DISPLAY SC-CODE(WS-SC-CODE) " " SC-PRODUCT(WS-SC-CODE)
+                        " " SC-PRICE(WS-SC-CODE)
+                       
                 END-READ
            END-PERFORM
            CLOSE CSV-FILE.
