@@ -9,7 +9,7 @@
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT CSV-FILE ASSIGN TO "product.csv"
-               ORGANIZATION IS LINE SEQUENTIAL.
+             ORGANIZATION IS LINE SEQUENTIAL.
 
        DATA DIVISION.
        FILE SECTION.
@@ -20,12 +20,13 @@
       ******************************************************************
       * Read from CSV File 
        01 WS-EOF PIC X(1) VALUE 'N'.
-       01 WS-COL1 PIC X(35).
-       01 WS-COL2 PIC 9(3)V99.
-       01 WS-COMMA-POS PIC 99.
       ******************************************************************
+      * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
+      * This is the index for the array/table
            05 WS-SC-CODE PIC 9(2) VALUE 0.
+      * This is the array/table for the catalogue.  It does not work the
+      * the same as other programming languages.
            05 SHOP-CATALOGUE OCCURS 40 TIMES.
              10 SC-CODE PIC 9(2).
              10 SC-PRODUCT PIC X(35).
@@ -35,25 +36,25 @@
            PERFORM READ-CSV
            STOP RUN.
 
+      * Build catalogue from CSV file
        READ-CSV.
            OPEN INPUT CSV-FILE.
            PERFORM UNTIL WS-EOF='Y'
-               READ CSV-FILE
-                   AT END MOVE 'Y' TO WS-EOF
-                   NOT AT END
-                       ADD 1 TO WS-SC-CODE
-                       MOVE WS-SC-CODE TO SC-CODE(WS-SC-CODE)
-                       UNSTRING CSV-RECORD
-                           DELIMITED BY ','
-                           INTO SC-PRODUCT(WS-SC-CODE)
-                           SC-PRICE(WS-SC-CODE)
-                    
-      *                    INTO WS-COL1
-      *                         WS-COL2
+             READ CSV-FILE
+               AT END MOVE 'Y' TO WS-EOF
+               NOT AT END
+                 ADD 1 TO WS-SC-CODE
+                 MOVE WS-SC-CODE TO SC-CODE(WS-SC-CODE)
+                 UNSTRING CSV-RECORD
+                   DELIMITED BY ','
+                   INTO     
+                     SC-PRODUCT(WS-SC-CODE)
+                     SC-PRICE(WS-SC-CODE)
+
                 DISPLAY SC-CODE(WS-SC-CODE) " " SC-PRODUCT(WS-SC-CODE)
-                        " " SC-PRICE(WS-SC-CODE)
+                  " " SC-PRICE(WS-SC-CODE)
                        
-                END-READ
+             END-READ
            END-PERFORM
            CLOSE CSV-FILE.
        END-READ-CSV.
