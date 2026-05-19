@@ -5,14 +5,45 @@
        PROGRAM-ID.     SHOPCART.
        AUTHOR.         WAYNE JACKSON.
 
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT CSV-FILE ASSIGN TO "product.csv"
+               ORGANIZATION IS LINE SEQUENTIAL.
+
        DATA DIVISION.
+       FILE SECTION.
+       FD  CSV-FILE.
+       01 CSV-RECORD PIC X(80).
+       
        WORKING-STORAGE SECTION.
+       01 WS-EOF PIC X(1) VALUE 'N'.
+       01 WS-COL1 PIC X(35).
+       01 WS-COL2 PIC 9(3)V99.
+       01 WS-COMMA-POS PIC 99.
+      ************************************************************************* 
        01 HOMEWARECITY-STORAGE.
-           05 SHOP-CATALOGUE.
+           05 SHOP-CATALOGUE OCCURS 40 TIMES.
              10 SC-CODE PIC 9(2).
-             10 SC-PRODUCT PIC X(32).
-             10 SC-PRICE PIC 9V9(7).
+             10 SC-PRODUCT PIC X(35).
+             10 SC-PRICE PIC 9(3)V99.
 
        PROCEDURE DIVISION.
-           
+           PERFORM READ-CSV
            STOP RUN.
+
+       READ-CSV.
+           OPEN INPUT CSV-FILE.
+           PERFORM UNTIL WS-EOF='Y'
+               READ CSV-FILE
+                   AT END MOVE 'Y' TO WS-EOF
+                   NOT AT END
+                       UNSTRING CSV-RECORD
+                           DELIMITED BY ','
+                           INTO WS-COL1
+                                WS-COL2
+                DISPLAY WS-COL1 " - " WS-COL2
+                END-READ
+           END-PERFORM
+           CLOSE CSV-FILE.
+       END-READ-CSV.
