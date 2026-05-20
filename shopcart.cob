@@ -26,13 +26,14 @@
        01 WS-EOF PIC X(1) VALUE 'N'.
       ******************************************************************
       * Gap between columns
-       01 WS-GAP PIC X(4) VALUE SPACES.
+       01 WS-GAP       PIC X(4) VALUE SPACES.
+       01 WS-CART      PIC 9(4) VALUE 0.
       * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
       * This is the index for the array/table
            05 WS-SC-CODE   PIC 9(2) VALUE 0.
       * Column count for table view of catalogue   
-           05 WS-COLS      PIC 9(1) VALUE 0.
+           05 WS-COLS      PIC 9(1) VALUE 0.           
       * This is the array/table for the catalogue.  It does not work the
       * the same as other programming languages.
            05 SHOP-CATALOGUE OCCURS 40 TIMES.
@@ -40,15 +41,38 @@
              10 SC-PRODUCT PIC X(35).
              10 SC-PRICE PIC 9(3)V99.
       * Display variants of the catalogue     
-           05 SHOP-CATALOGUE-DISPLAY OCCURS 40 TIMES.
-             10 SCD-CODE PIC ZZZZ.
-             10 SCD-PRODUCT PIC X(35).
-             10 SCD-PRICE PIC ZZZZ.99.
+           05 SHOP-CAT-DISP.
+             10 SCD-DISP-CODE PIC ZZZZ.
+             10 SCD-DISP-PROD PIC X(35).
+             10 SCD-DISP-PRICE PIC ZZZZ.99.
+
       * Variables for the catalogue headers   
            05 CATALOGUE-HEADERS.
              10 CH-CODE PIC X(4) VALUE "CODE".
              10 CH-PRODUCT PIC X(35) VALUE "PRODUCT NAME".
              10 CH-PRICE PIC X(7) VALUE "$ PRICE".
+      * Variables for the shopping cart list header    
+           05 SHOPPING-CART-HEADERS.
+             10 SH-MEMBER   PIC X(10)   VALUE "MEMBERSHIP".
+             10 SH-CODE     PIC X(4)    VALUE "CODE".
+             10 SH-PRODUCT  PIC X(35)   VALUE "PRODUCT".
+             10 SH-PRICE    PIC X(7)    VALUE "$ PRICE".
+             10 SH-QUANT    PIC X(8)    VALUE "QUANTITY".
+             10 SH-SHIP     PIC X(15)   VALUE "SHIPPING METHOD".
+             10 SH-FEE      PIC X(12)   VALUE "SHIPPING FEE".
+             10 SH-COST     PIC X(7)    VALUE "COST $".
+      * Table for the shopping cart list
+           05 SHOPPING-CART-LIST OCCURS 1 TO 9999 TIMES
+                DEPENDING ON WS-CART
+                INDEXED BY CART-INDEX.
+             10 SCL-MEMBER   PIC X(10).
+             10 SCL-CODE     PIC X(4).
+             10 SCL-PRODUCT  PIC X(35).
+             10 SCL-PRICE    PIC X(7).
+             10 SCL-QUANT    PIC X(8).
+             10 SCL-SHIP     PIC X(15).
+             10 SCL-FEE      PIC X(12).
+             10 SCL-COST     PIC X(7).
 
        PROCEDURE DIVISION.
       * Build the catalogue from the CSV File
@@ -76,8 +100,6 @@
            CLOSE CSV-FILE.
        END-BUILD-CAT.
 
-      
-
       * Testing that the catalogue has been created and can be displayed
        TEST-DISPLAY-CAT.
       * Reset the counter to 0 to
@@ -96,21 +118,26 @@
       * catalogue.  This is going to get confusing rather quickly hence
       * why databases would be more suited for this type of thing
        DISPLAY-CAT.
-           PERFORM BUILD-DISPLAY-CAT
            PERFORM DISPLAY-CAT-HEADER
            MOVE 0 TO WS-SC-CODE
            MOVE 0 TO WS-COLS
            PERFORM UNTIL WS-SC-CODE IS EQUAL 40
              ADD 1 TO WS-SC-CODE
              IF WS-COLS EQUAL 0 THEN
-               DISPLAY SCD-CODE(WS-SC-CODE) WS-GAP
-                       SCD-PRODUCT(WS-SC-CODE) WS-GAP
-                       SCD-PRICE(WS-SC-CODE) WS-GAP 
+               MOVE SC-CODE(WS-SC-CODE) TO SCD-DISP-CODE
+               MOVE SC-PRODUCT(WS-SC-CODE) TO SCD-DISP-PROD
+               MOVE SC-PRICE(WS-SC-CODE) TO SCD-DISP-PRICE
+               DISPLAY SCD-DISP-CODE WS-GAP
+                       SCD-DISP-PROD WS-GAP
+                       SCD-DISP-PRICE WS-GAP
                        WITH NO ADVANCING
              ELSE
-               DISPLAY SCD-CODE(WS-SC-CODE) WS-GAP
-                       SCD-PRODUCT(WS-SC-CODE) WS-GAP
-                       SCD-PRICE(WS-SC-CODE) WS-GAP
+               MOVE SC-CODE(WS-SC-CODE) TO SCD-DISP-CODE
+               MOVE SC-PRODUCT(WS-SC-CODE) TO SCD-DISP-PROD
+               MOVE SC-PRICE(WS-SC-CODE) TO SCD-DISP-PRICE
+               DISPLAY SCD-DISP-CODE WS-GAP
+                       SCD-DISP-PROD WS-GAP
+                       SCD-DISP-PRICE WS-GAP
              END-IF
              ADD 1 TO WS-COLS
              IF WS-COLS EQUAL 2 THEN
@@ -142,15 +169,3 @@
              END-IF
            END-PERFORM.
        END-DISPLAY-CAT-HEADER.
-
-      * Because of the way COBOL stores data, it is necessary to
-      * create a separate display function for the catalogue
-       BUILD-DISPLAY-CAT.
-           MOVE 0 TO WS-SC-CODE
-           PERFORM UNTIL WS-SC-CODE IS EQUAL 40
-             ADD 1 TO WS-SC-CODE
-             MOVE SC-CODE(WS-SC-CODE) TO SCD-CODE(WS-SC-CODE)
-             MOVE SC-PRICE(WS-SC-CODE) TO SCD-PRICE(WS-SC-CODE)
-             MOVE SC-PRODUCT(WS-SC-CODE) TO SCD-PRODUCT(WS-SC-CODE)
-           END-PERFORM.
-       END-BUILD-DISPLAY-CAT.
