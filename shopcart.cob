@@ -27,13 +27,19 @@
       ******************************************************************
       * Gap between columns
        01 WS-GAP       PIC X(4) VALUE SPACES.
+      * Counter for the Shopping Cart List
        01 WS-CART      PIC 9(4) VALUE 0.
+      * Max shopping cart size
+       01 WS-MAX-CART  PIC 9(4) VALUE 9999.
+      * Column count for table view of catalogue   
+       01 WS-COLS      PIC 9(1) VALUE 0.
+       
       * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
       * This is the index for the array/table
-           05 WS-SC-CODE   PIC 9(2) VALUE 0.
-      * Column count for table view of catalogue   
-           05 WS-COLS      PIC 9(1) VALUE 0.           
+      * HWC-SC-CODE: Shop Catalogue Code
+           05 HWC-SC-CODE   PIC 9(2) VALUE 0.
+
       * This is the array/table for the catalogue.  It does not work the
       * the same as other programming languages.
            05 SHOP-CATALOGUE OCCURS 40 TIMES.
@@ -42,10 +48,9 @@
              10 SC-PRICE PIC 9(3)V99.
       * Display variants of the catalogue     
            05 SHOP-CAT-DISP.
-             10 SCD-DISP-CODE PIC ZZZZ.
+             10 SCD-DISP-CODE PIC Z(4).
              10 SCD-DISP-PROD PIC X(35).
-             10 SCD-DISP-PRICE PIC ZZZZ.99.
-
+             10 SCD-DISP-PRICE PIC Z(4).99.
       * Variables for the catalogue headers   
            05 CATALOGUE-HEADERS.
              10 CH-CODE PIC X(4) VALUE "CODE".
@@ -61,6 +66,16 @@
              10 SH-SHIP     PIC X(15)   VALUE "SHIPPING METHOD".
              10 SH-FEE      PIC X(12)   VALUE "SHIPPING FEE".
              10 SH-COST     PIC X(7)    VALUE "COST $".
+      * Variables to display the shopping cart
+           05 SHOPPING-CART-DISPLAY.
+             10 SHD-MEMBER   PIC X(10).
+             10 SHD-CODE     PIC Z(4).
+             10 SHD-PRODUCT  PIC X(35).
+             10 SHD-PRICE    PIC Z(4).99.
+             10 SHD-QUANT    PIC Z(8).
+             10 SHD-SHIP     PIC X(15).
+             10 SHD-FEE      PIC Z(9).99.
+             10 SHD-COST     PIC Z(4).99.
       * Table for the shopping cart list
            05 SHOPPING-CART-LIST OCCURS 1 TO 9999 TIMES
                 DEPENDING ON WS-CART
@@ -78,7 +93,6 @@
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
            PERFORM DISPLAY-CAT
-      
            STOP RUN.
 
       * Build catalogue from CSV file
@@ -88,13 +102,13 @@
              READ CSV-FILE
                AT END MOVE 'Y' TO WS-EOF
                NOT AT END
-                 ADD 1 TO WS-SC-CODE
-                 MOVE WS-SC-CODE TO SC-CODE(WS-SC-CODE)
+                 ADD 1 TO HWC-SC-CODE
+                 MOVE HWC-SC-CODE TO SC-CODE(HWC-SC-CODE)
                  UNSTRING CSV-RECORD
                    DELIMITED BY ','
                    INTO     
-                     SC-PRODUCT(WS-SC-CODE)
-                     SC-PRICE(WS-SC-CODE)
+                     SC-PRODUCT(HWC-SC-CODE)
+                     SC-PRICE(HWC-SC-CODE)
              END-READ
            END-PERFORM
            CLOSE CSV-FILE.
@@ -103,13 +117,13 @@
       * Testing that the catalogue has been created and can be displayed
        TEST-DISPLAY-CAT.
       * Reset the counter to 0 to
-           MOVE 0 TO WS-SC-CODE
+           MOVE 0 TO HWC-SC-CODE
       * Iterate through table   
-           PERFORM UNTIL WS-SC-CODE IS EQUAL 40
-             ADD 1 TO WS-SC-CODE
-             DISPLAY SC-CODE(WS-SC-CODE) " "
-                     SC-PRODUCT(WS-SC-CODE) " "
-                     SC-PRICE(WS-SC-CODE)
+           PERFORM UNTIL HWC-SC-CODE IS EQUAL 40
+             ADD 1 TO HWC-SC-CODE
+             DISPLAY SC-CODE(HWC-SC-CODE) " "
+                     SC-PRODUCT(HWC-SC-CODE) " "
+                     SC-PRICE(HWC-SC-CODE)
            END-PERFORM.
        END-TEST-DISPLAY-CAT.
 
@@ -119,22 +133,22 @@
       * why databases would be more suited for this type of thing
        DISPLAY-CAT.
            PERFORM DISPLAY-CAT-HEADER
-           MOVE 0 TO WS-SC-CODE
+           MOVE 0 TO HWC-SC-CODE
            MOVE 0 TO WS-COLS
-           PERFORM UNTIL WS-SC-CODE IS EQUAL 40
-             ADD 1 TO WS-SC-CODE
+           PERFORM UNTIL HWC-SC-CODE IS EQUAL 40
+             ADD 1 TO HWC-SC-CODE
              IF WS-COLS EQUAL 0 THEN
-               MOVE SC-CODE(WS-SC-CODE) TO SCD-DISP-CODE
-               MOVE SC-PRODUCT(WS-SC-CODE) TO SCD-DISP-PROD
-               MOVE SC-PRICE(WS-SC-CODE) TO SCD-DISP-PRICE
+               MOVE SC-CODE(HWC-SC-CODE) TO SCD-DISP-CODE
+               MOVE SC-PRODUCT(HWC-SC-CODE) TO SCD-DISP-PROD
+               MOVE SC-PRICE(HWC-SC-CODE) TO SCD-DISP-PRICE
                DISPLAY SCD-DISP-CODE WS-GAP
                        SCD-DISP-PROD WS-GAP
                        SCD-DISP-PRICE WS-GAP
                        WITH NO ADVANCING
              ELSE
-               MOVE SC-CODE(WS-SC-CODE) TO SCD-DISP-CODE
-               MOVE SC-PRODUCT(WS-SC-CODE) TO SCD-DISP-PROD
-               MOVE SC-PRICE(WS-SC-CODE) TO SCD-DISP-PRICE
+               MOVE SC-CODE(HWC-SC-CODE) TO SCD-DISP-CODE
+               MOVE SC-PRODUCT(HWC-SC-CODE) TO SCD-DISP-PROD
+               MOVE SC-PRICE(HWC-SC-CODE) TO SCD-DISP-PRICE
                DISPLAY SCD-DISP-CODE WS-GAP
                        SCD-DISP-PROD WS-GAP
                        SCD-DISP-PRICE WS-GAP
@@ -150,9 +164,9 @@
       * from the original as it is pretty obvious what is going on
        DISPLAY-CAT-HEADER.
            MOVE 0 TO WS-COLS
-           MOVE 0 TO WS-SC-CODE
-           PERFORM UNTIL WS-SC-CODE IS EQUAL 2
-             ADD 1 TO WS-SC-CODE
+           MOVE 0 TO HWC-SC-CODE
+           PERFORM UNTIL HWC-SC-CODE IS EQUAL 2
+             ADD 1 TO HWC-SC-CODE
              IF WS-COLS EQUAL 0 THEN
                DISPLAY CH-CODE WS-GAP
                        CH-PRODUCT WS-GAP
