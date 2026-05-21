@@ -1,0 +1,39 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MUCK.
+       
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  TEST-STORAGE.
+           05 TS-TEXT PIC X(15).
+           05 TS-NUM  PIC 9(2).
+           05 TS-WORD PIC X(3).
+       
+       PROCEDURE DIVISION.
+           DISPLAY "ENTER A TWO DIGIT (XX) NUMBER: "
+             WITH NO ADVANCING
+           ACCEPT TS-TEXT
+
+           PERFORM VALID-NUMBER
+
+           DISPLAY "ENTER 'YES' OR 'NO': "
+             WITH NO ADVANCING
+           ACCEPT TS-TEXT
+
+           PERFORM VALID-TEXT
+
+           STOP RUN.
+
+       VALID-NUMBER.
+           COMPUTE TS-NUM = FUNCTION NUMVAL(TS-TEXT)
+           IF TS-NUM EQUAL ZERO THEN
+             DISPLAY "ERROR NOT ACCEPTING ZERO"
+           ELSE
+             DISPLAY "THANK YOU " TS-NUM " MILLION TIMES"
+           END-IF.
+       END-VALID-NUMBER.
+
+       VALID-TEXT.
+           MOVE FUNCTION TRIM(TS-TEXT) TO TS-WORD
+           MOVE FUNCTION UPPER-CASE(TS-WORD) TO TS-WORD.
+           DISPLAY "YOU ENTERED '"TS-WORD"'".
+       END-VALID-TEXT.

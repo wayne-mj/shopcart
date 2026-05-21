@@ -33,6 +33,7 @@
        01 WS-MAX-CART  PIC 9(4) VALUE 9999.
       * Column count for table view of catalogue   
        01 WS-COLS      PIC 9(1) VALUE 0.
+       01 WS-MEMBER    PIC X(3).
        
       * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
@@ -183,3 +184,12 @@
              END-IF
            END-PERFORM.
        END-DISPLAY-CAT-HEADER.
+
+       VALIDATE-MEMBER.
+           DISPLAY "IS THE CUSTOMER A MEMBER YES/NO/END: "
+             WITH NO ADVANCING
+           ACCEPT WS-MEMBER
+           IF WS-MEMBER NOT EQUAL "END" THEN
+             MOVE 1 TO CART-INDEX
+           END-IF.
+       END-VALIDATE-MEMBER.

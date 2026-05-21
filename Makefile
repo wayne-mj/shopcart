@@ -3,7 +3,9 @@ COBCQUIET=-x -Wall
 COBCFLAGS=-x -Wall -Wextra
 COBCJOB=-jx
 PROJ=shopcart
+MUCK=muck
 SRC=$(PROJ).cob 
+MUCKSRC=$(MUCK).cob
 
 # Build everything LOUDLY
 all: clean $(PROJ)
@@ -19,6 +21,10 @@ run: clean $(SRC)
 # Just build the code
 $(PROJ): $(SRC)
 	$(COBC) $(COBCFLAGS) $(SRC)
+
+# Practice code to test ideas
+$(MUCK): $(MUCKSRC)
+	$(COBC) $(COBCFLAGS) $(MUCKSRC)
 
 # Remove the executable
 clean:
