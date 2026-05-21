@@ -33,7 +33,8 @@
        01 WS-MAX-CART  PIC 9(4) VALUE 9999.
       * Column count for table view of catalogue   
        01 WS-COLS      PIC 9(1) VALUE 0.
-       01 WS-MEMBER    PIC X(3).
+       01 WS-RESP      PIC X(5).
+       01 WS-RESP-NUM  PIC 9(2).
        
       * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
@@ -93,18 +94,33 @@
        PROCEDURE DIVISION.
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
-           PERFORM DISPLAY-CAT
+      *    PERFORM DISPLAY-CAT
+           PERFORM UNTIL WS-RESP-NUM EQUAL 3
+      *      MOVE 0 TO WS-RESP-NUM
+      *      MOVE SPACES TO SHD-MEMBER
+             PERFORM ASK-FOR-MEMBER
+             DISPLAY WS-RESP-NUM
+             DISPLAY SHD-MEMBER             
+           END-PERFORM
            STOP RUN.
 
       * Build catalogue from CSV file
        BUILD-CAT.
+      * Open the CSV file for input
            OPEN INPUT CSV-FILE.
+      * Until the EOF 'boolean' has been set keep reading
            PERFORM UNTIL WS-EOF='Y'
+      * Read from the file, and when the EOF is hit, flag it as such
              READ CSV-FILE
                AT END MOVE 'Y' TO WS-EOF
                NOT AT END
+      * This is the catalogue being built as it is read from the file
+      * Increment the product code
                  ADD 1 TO HWC-SC-CODE
+      * Assign the product code to the table
                  MOVE HWC-SC-CODE TO SC-CODE(HWC-SC-CODE)
+      * As the values are are separated by ',' they need to be split
+      * and moved into the table
                  UNSTRING CSV-RECORD
                    DELIMITED BY ','
                    INTO     
@@ -112,10 +128,11 @@
                      SC-PRICE(HWC-SC-CODE)
              END-READ
            END-PERFORM
+      * Close the file
            CLOSE CSV-FILE.
        END-BUILD-CAT.
 
-      * Testing that the catalogue has been created and can be displayed
+      * Testing that the catalogue has been created and can be displayed.
        TEST-DISPLAY-CAT.
       * Reset the counter to 0 to
            MOVE 0 TO HWC-SC-CODE
@@ -131,14 +148,22 @@
       * Display the catalogue in two alternating columns
       * This uses the display catalogue rather than the processing
       * catalogue.  This is going to get confusing rather quickly hence
-      * why databases would be more suited for this type of thing
+      * why databases would be more suited for this type of thing.
        DISPLAY-CAT.
+      * Display the header for the catalogue
            PERFORM DISPLAY-CAT-HEADER
+      * Set the index for 0
            MOVE 0 TO HWC-SC-CODE
+      * Set the coluns to 0
            MOVE 0 TO WS-COLS
+      * Loop through the table
            PERFORM UNTIL HWC-SC-CODE IS EQUAL 40
+      * Increment the index counter
              ADD 1 TO HWC-SC-CODE
+      * If the columns is the first
              IF WS-COLS EQUAL 0 THEN
+      * Move the table to the displayable variables and then display
+      * without a newline
                MOVE SC-CODE(HWC-SC-CODE) TO SCD-DISP-CODE
                MOVE SC-PRODUCT(HWC-SC-CODE) TO SCD-DISP-PROD
                MOVE SC-PRICE(HWC-SC-CODE) TO SCD-DISP-PRICE
@@ -146,6 +171,7 @@
                        SCD-DISP-PROD WS-GAP
                        SCD-DISP-PRICE WS-GAP
                        WITH NO ADVANCING
+      * Otherwise just move the displayable variables and display them
              ELSE
                MOVE SC-CODE(HWC-SC-CODE) TO SCD-DISP-CODE
                MOVE SC-PRODUCT(HWC-SC-CODE) TO SCD-DISP-PROD
@@ -154,7 +180,9 @@
                        SCD-DISP-PROD WS-GAP
                        SCD-DISP-PRICE WS-GAP
              END-IF
+      * Increment the column count
              ADD 1 TO WS-COLS
+      * Once the column count is 2 reset
              IF WS-COLS EQUAL 2 THEN
                MOVE 0 TO WS-COLS
              END-IF
@@ -162,7 +190,7 @@
        END-DISPLAY-CAT.
 
       * This is the header for the catalogue.  It has been simplified
-      * from the original as it is pretty obvious what is going on
+      * from the original as it is pretty obvious what is going on.
        DISPLAY-CAT-HEADER.
            MOVE 0 TO WS-COLS
            MOVE 0 TO HWC-SC-CODE
@@ -185,11 +213,33 @@
            END-PERFORM.
        END-DISPLAY-CAT-HEADER.
 
-       VALIDATE-MEMBER.
-           DISPLAY "IS THE CUSTOMER A MEMBER YES/NO/END: "
-             WITH NO ADVANCING
-           ACCEPT WS-MEMBER
-           IF WS-MEMBER NOT EQUAL "END" THEN
-             MOVE 1 TO CART-INDEX
-           END-IF.
-       END-VALIDATE-MEMBER.
+      * Query if the customer is a member or not, or to terminate the 
+      * data entry process.
+       ASK-FOR-MEMBER.
+      * Ensure that the response is zero'ed out
+           MOVE 0 to WS-RESP-NUM
+      * Clear out the member status
+           MOVE SPACES TO SHD-MEMBER
+      * Loop until the correct data is entered
+           PERFORM UNTIL WS-RESP-NUM GREATER 0 AND LESS 4
+             DISPLAY "***********************************"
+             DISPLAY "IS THE CUSTOMER A MEMBER? (1/2/3): "
+             DISPLAY "1.) YES" WS-GAP "2.) NO" WS-GAP "3.) END" 
+                     WS-GAP ">:"
+               WITH NO ADVANCING
+      * Get the response and convert it to a number if possible
+             ACCEPT WS-RESP
+             COMPUTE WS-RESP-NUM = FUNCTION NUMVAL(WS-RESP)
+      * Perform a test of the number response: 1, 2 or 3 and assign
+      * accordingly or if necessary display an error message
+             IF WS-RESP-NUM EQUAL 1 THEN
+               MOVE "YES" TO SHD-MEMBER
+             END-IF
+             IF WS-RESP-NUM EQUAL 2 THEN
+                 MOVE "NO" TO SHD-MEMBER
+             END-IF
+             IF WS-RESP-NUM GREATER 3 OR WS-RESP-NUM LESS 1 THEN
+                 DISPLAY "INVALID OPTION"
+             END-IF
+           END-PERFORM.
+       END-ASK-FOR-MEMBER.
