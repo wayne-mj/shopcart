@@ -32,9 +32,14 @@
       * Max shopping cart size
        01 WS-MAX-CART  PIC 9(4) VALUE 9999.
       * Column count for table view of catalogue   
-       01 WS-COLS      PIC 9(1) VALUE 0.
-       01 WS-RESP      PIC X(5).
-       01 WS-RESP-NUM  PIC 9(2).
+       01 WS-COLS          PIC 9(1) VALUE 0.
+      * Variable for responses for console input
+       01 WS-RESP          PIC X(5).
+      * Temporary variables
+       01 WS-RESP-MEM      PIC 9(2).
+       01 WS-RESP-CDE      PIC 9(2).
+       01 WS-RESP-CDE-RNG  PIC X(1) VALUE 'N'.
+       01 WS-RESP-NUM      PIC 9(2).
        
       * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
@@ -94,19 +99,52 @@
        PROCEDURE DIVISION.
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
-      *    PERFORM DISPLAY-CAT
-           PERFORM UNTIL WS-RESP-NUM EQUAL 3
-      *      MOVE 0 TO WS-RESP-NUM
-      *      MOVE SPACES TO SHD-MEMBER
-             PERFORM ASK-FOR-MEMBER
-             DISPLAY WS-RESP-NUM
-             DISPLAY SHD-MEMBER             
+           
+      *    PERFORM UNTIL WS-RESP-MEM EQUAL 3
+      **      MOVE 0 TO WS-RESP-NUM
+      **      MOVE SPACES TO SHD-MEMBER
+      *      PERFORM ASK-FOR-MEMBER
+      *      DISPLAY WS-RESP-MEM
+      *      DISPLAY SHD-MEMBER             
+      *    END-PERFORM
+
+           PERFORM UNTIL WS-RESP-CDE-RNG EQUAL 'Y'
+             DISPLAY "SEARCH ON WHAT CODE: 1-40:"
+               WITH NO ADVANCING
+             ACCEPT WS-RESP-CDE
+             PERFORM VALIDATE-PRODUCT-CODE
            END-PERFORM
+      *    MOVE 1 TO WS-RESP-CDE
+      *    PERFORM SEARCH-PRODUCT-CODE
+      *    DISPLAY SHD-CODE WS-GAP
+      *            SHD-PRODUCT WS-GAP
+      *            SHD-PRICE WS-GAP
+      *
+      *    MOVE 40 TO WS-RESP-CDE 
+      *    PERFORM SEARCH-PRODUCT-CODE
+      *    DISPLAY SHD-CODE WS-GAP
+      *            SHD-PRODUCT WS-GAP
+      *            SHD-PRICE WS-GAP
+      *    
+      *    MOVE 5 TO WS-RESP-CDE 
+      *    PERFORM SEARCH-PRODUCT-CODE
+      *    DISPLAY SHD-CODE WS-GAP
+      *            SHD-PRODUCT WS-GAP
+      *            SHD-PRICE WS-GAP
+      *
+      *    MOVE 50 TO WS-RESP-CDE 
+      *    PERFORM SEARCH-PRODUCT-CODE
+      *    DISPLAY SHD-CODE WS-GAP
+      *            SHD-PRODUCT WS-GAP
+      *            SHD-PRICE WS-GAP
+
            STOP RUN.
 
+      **************************************************************************
       * Build catalogue from CSV file
        BUILD-CAT.
       * Open the CSV file for input
+      *    MOVE 0 to HWC-SC-CODE
            OPEN INPUT CSV-FILE.
       * Until the EOF 'boolean' has been set keep reading
            PERFORM UNTIL WS-EOF='Y'
@@ -132,19 +170,22 @@
            CLOSE CSV-FILE.
        END-BUILD-CAT.
 
+      **************************************************************************
       * Testing that the catalogue has been created and can be displayed.
        TEST-DISPLAY-CAT.
       * Reset the counter to 0 to
-           MOVE 0 TO HWC-SC-CODE
+           MOVE 1 TO HWC-SC-CODE
       * Iterate through table   
-           PERFORM UNTIL HWC-SC-CODE IS EQUAL 40
-             ADD 1 TO HWC-SC-CODE
+           PERFORM UNTIL HWC-SC-CODE IS GREATER THAN 40
+             
              DISPLAY SC-CODE(HWC-SC-CODE) " "
                      SC-PRODUCT(HWC-SC-CODE) " "
                      SC-PRICE(HWC-SC-CODE)
+             ADD 1 TO HWC-SC-CODE
            END-PERFORM.
        END-TEST-DISPLAY-CAT.
 
+      **************************************************************************
       * Display the catalogue in two alternating columns
       * This uses the display catalogue rather than the processing
       * catalogue.  This is going to get confusing rather quickly hence
@@ -153,13 +194,12 @@
       * Display the header for the catalogue
            PERFORM DISPLAY-CAT-HEADER
       * Set the index for 0
-           MOVE 0 TO HWC-SC-CODE
-      * Set the coluns to 0
+           MOVE 1 TO HWC-SC-CODE
+      * Set the columns to 0
            MOVE 0 TO WS-COLS
       * Loop through the table
-           PERFORM UNTIL HWC-SC-CODE IS EQUAL 40
-      * Increment the index counter
-             ADD 1 TO HWC-SC-CODE
+           PERFORM UNTIL HWC-SC-CODE IS GREATER THAN 40
+
       * If the columns is the first
              IF WS-COLS EQUAL 0 THEN
       * Move the table to the displayable variables and then display
@@ -186,9 +226,12 @@
              IF WS-COLS EQUAL 2 THEN
                MOVE 0 TO WS-COLS
              END-IF
+      * Increment the index counter
+             ADD 1 TO HWC-SC-CODE
            END-PERFORM.
        END-DISPLAY-CAT.
-
+      
+      **************************************************************************
       * This is the header for the catalogue.  It has been simplified
       * from the original as it is pretty obvious what is going on.
        DISPLAY-CAT-HEADER.
@@ -213,33 +256,70 @@
            END-PERFORM.
        END-DISPLAY-CAT-HEADER.
 
+      **************************************************************************
       * Query if the customer is a member or not, or to terminate the 
       * data entry process.
        ASK-FOR-MEMBER.
       * Ensure that the response is zero'ed out
-           MOVE 0 to WS-RESP-NUM
+           MOVE 0 to WS-RESP-MEM
       * Clear out the member status
            MOVE SPACES TO SHD-MEMBER
       * Loop until the correct data is entered
-           PERFORM UNTIL WS-RESP-NUM GREATER 0 AND LESS 4
-             DISPLAY "***********************************"
+           PERFORM UNTIL WS-RESP-MEM GREATER 0 AND LESS 4
+             DISPLAY "************************************"
              DISPLAY "IS THE CUSTOMER A MEMBER? (1/2/3): "
              DISPLAY "1.) YES" WS-GAP "2.) NO" WS-GAP "3.) END" 
-                     WS-GAP ">:"
+                     WS-GAP ">: "
                WITH NO ADVANCING
       * Get the response and convert it to a number if possible
              ACCEPT WS-RESP
-             COMPUTE WS-RESP-NUM = FUNCTION NUMVAL(WS-RESP)
+             COMPUTE WS-RESP-MEM = FUNCTION NUMVAL(WS-RESP)
       * Perform a test of the number response: 1, 2 or 3 and assign
       * accordingly or if necessary display an error message
-             IF WS-RESP-NUM EQUAL 1 THEN
+             IF WS-RESP-MEM EQUAL 1 THEN
                MOVE "YES" TO SHD-MEMBER
              END-IF
-             IF WS-RESP-NUM EQUAL 2 THEN
+             IF WS-RESP-MEM EQUAL 2 THEN
                  MOVE "NO" TO SHD-MEMBER
              END-IF
-             IF WS-RESP-NUM GREATER 3 OR WS-RESP-NUM LESS 1 THEN
+             IF WS-RESP-MEM GREATER 3 OR WS-RESP-MEM LESS 1 THEN
                  DISPLAY "INVALID OPTION"
              END-IF
            END-PERFORM.
        END-ASK-FOR-MEMBER.
+      
+      **************************************************************************
+      * Poor man's search of the catalogue
+       SEARCH-PRODUCT-CODE.
+      * Initialise the variables to a known state before using or returning
+           MOVE 1 TO HWC-SC-CODE
+           MOVE 0 TO SHD-CODE
+           MOVE "No such product" TO SHD-PRODUCT
+           MOVE 0 TO SHD-PRICE
+
+      * Ironically, everything starts at 1, so we need to count until after 40
+      * exiting the loop when there is a match else increment
+           PERFORM UNTIL HWC-SC-CODE GREATER THAN 40
+               IF SC-CODE(HWC-SC-CODE) EQUAL WS-RESP-CDE THEN
+                 MOVE SC-CODE(HWC-SC-CODE) TO SHD-CODE
+                 MOVE SC-PRODUCT(HWC-SC-CODE) TO SHD-PRODUCT
+                 MOVE SC-PRICE(HWC-SC-CODE) TO SHD-PRICE
+                 EXIT PERFORM
+               ELSE
+                 ADD 1 TO HWC-SC-CODE
+               END-IF               
+           END-PERFORM.           
+       END-SEARCH-PRODUCT-CODE.
+
+      **************************************************************************
+
+       VALIDATE-PRODUCT-CODE.
+           IF WS-RESP-CDE GREATER 0 AND WS-RESP-CDE LESS 41 THEN
+             MOVE 'Y' TO WS-RESP-CDE-RNG
+           ELSE
+             MOVE 'N' TO WS-RESP-CDE-RNG
+           END-IF.            
+       END-VALIDATE-PRODUCT-CODE.
+
+      **************************************************************************
+
