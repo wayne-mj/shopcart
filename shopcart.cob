@@ -38,7 +38,11 @@
       * Temporary variables
        01 WS-RESP-MEM      PIC 9(2).
        01 WS-RESP-CDE      PIC 9(2).
+       01 WS-RESP-QNT      PIC 9(2).
+       01 WS-RESP-DEL      PIC 9(2).
+       01 WS-RESP-QNT-RNG  PIC X(1) VALUE 'N'.
        01 WS-RESP-CDE-RNG  PIC X(1) VALUE 'N'.
+       01 WS-RESP-DEL-RNG  PIC X(1) VALUE 'N'.
        01 WS-RESP-NUM      PIC 9(2).
        
       * Data structures for catalogue including temporary counter
@@ -46,7 +50,6 @@
       * This is the index for the array/table
       * HWC-SC-CODE: Shop Catalogue Code
            05 HWC-SC-CODE   PIC 9(2) VALUE 0.
-
       * This is the array/table for the catalogue.  It does not work the
       * the same as other programming languages.
            05 SHOP-CATALOGUE OCCURS 40 TIMES.
@@ -108,12 +111,8 @@
       *      DISPLAY SHD-MEMBER             
       *    END-PERFORM
 
-           PERFORM UNTIL WS-RESP-CDE-RNG EQUAL 'Y'
-             DISPLAY "SEARCH ON WHAT CODE: 1-40:"
-               WITH NO ADVANCING
-             ACCEPT WS-RESP-CDE
-             PERFORM VALIDATE-PRODUCT-CODE
-           END-PERFORM
+           PERFORM ASK-FOR-PRODUCT-CODE
+           PERFORM ASK-FOR-QUANTITY
       *    MOVE 1 TO WS-RESP-CDE
       *    PERFORM SEARCH-PRODUCT-CODE
       *    DISPLAY SHD-CODE WS-GAP
@@ -168,8 +167,7 @@
            END-PERFORM
       * Close the file
            CLOSE CSV-FILE.
-       END-BUILD-CAT.
-
+       
       **************************************************************************
       * Testing that the catalogue has been created and can be displayed.
        TEST-DISPLAY-CAT.
@@ -183,8 +181,7 @@
                      SC-PRICE(HWC-SC-CODE)
              ADD 1 TO HWC-SC-CODE
            END-PERFORM.
-       END-TEST-DISPLAY-CAT.
-
+       
       **************************************************************************
       * Display the catalogue in two alternating columns
       * This uses the display catalogue rather than the processing
@@ -229,8 +226,7 @@
       * Increment the index counter
              ADD 1 TO HWC-SC-CODE
            END-PERFORM.
-       END-DISPLAY-CAT.
-      
+             
       **************************************************************************
       * This is the header for the catalogue.  It has been simplified
       * from the original as it is pretty obvious what is going on.
@@ -254,8 +250,7 @@
                MOVE 0 TO WS-COLS
              END-IF
            END-PERFORM.
-       END-DISPLAY-CAT-HEADER.
-
+       
       **************************************************************************
       * Query if the customer is a member or not, or to terminate the 
       * data entry process.
@@ -286,7 +281,6 @@
                  DISPLAY "INVALID OPTION"
              END-IF
            END-PERFORM.
-       END-ASK-FOR-MEMBER.
       
       **************************************************************************
       * Poor man's search of the catalogue
@@ -309,17 +303,75 @@
                  ADD 1 TO HWC-SC-CODE
                END-IF               
            END-PERFORM.           
-       END-SEARCH-PRODUCT-CODE.
 
       **************************************************************************
-
+      * Validate the product code range is between inclusively 1 and 40
+      * and set the 'boolean' appropriately.
        VALIDATE-PRODUCT-CODE.
            IF WS-RESP-CDE GREATER 0 AND WS-RESP-CDE LESS 41 THEN
              MOVE 'Y' TO WS-RESP-CDE-RNG
            ELSE
              MOVE 'N' TO WS-RESP-CDE-RNG
            END-IF.            
-       END-VALIDATE-PRODUCT-CODE.
+      
+      **************************************************************************
+      * Validate the delivery methods is between 1 and 2 inclusively and
+      * set the 'boolean' appropriately.
+       VALIDATE-DELIVERY-METHOD.
+           IF WS-RESP-DEL GREATER 0 AND WS-RESP-DEL LESS 3 THEN
+             MOVE 'Y' TO WS-RESP-DEL-RNG
+           ELSE
+             MOVE 'N' TO WS-RESP-DEL-RNG
+           END-IF.
 
+      **************************************************************************
+      * Validate that the quantity chosen is between the inclusive ranges
+      * 1 and 29 and return the appropriate 'boolean' response.
+       VALIDATE-QUANTITY.
+           IF WS-RESP-QNT GREATER 0 AND WS-RESP-QNT LESS 30 THEN
+             MOVE 'Y' TO WS-RESP-QNT-RNG
+           ELSE
+             MOVE 'N' TO WS-RESP-QNT-RNG
+           END-IF.           
+      
+      **************************************************************************
+      * Ask the user for the product code
+       ASK-FOR-PRODUCT-CODE.
+           PERFORM DISPLAY-CAT
+      * Loop until the user gets it right
+           PERFORM UNTIL WS-RESP-CDE-RNG EQUAL 'Y'
+             DISPLAY " "
+             DISPLAY "ENTER A PRODUCT CODE (1-40): "
+               WITH NO ADVANCING
+             ACCEPT WS-RESP
+             COMPUTE WS-RESP-CDE = FUNCTION NUMVAL(WS-RESP)
+             PERFORM VALIDATE-PRODUCT-CODE
+           END-PERFORM.
+
+      **************************************************************************
+      * Ask the user for the quantity of the product
+       ASK-FOR-QUANTITY.
+           PERFORM UNTIL WS-RESP-QNT-RNG EQUAL 'Y'
+             DISPLAY " "
+             DISPLAY "ENTER THE QUANTITY OF PRODUCT (1-29): "
+               WITH NO ADVANCING
+             ACCEPT WS-RESP
+             COMPUTE WS-RESP-QNT = FUNCTION NUMVAL(WS-RESP)
+             PERFORM VALIDATE-QUANTITY
+           END-PERFORM.
+
+      **************************************************************************
+      * Ask for the delivery method
+       ASK-FOR-DELIVERY-METHOD.
+           PERFORM UNTIL WS-RESP-DEL-RNG EQUAL 'Y'
+             DISPLAY " "
+             DISPLAY "ENTER THE DELIVERY METHOD"
+             DISPLAY "1.) DELIVERY 2). PICK-UP (1-2): "
+               WITH NO ADVANCING
+             ACCEPT WS-RESP
+             COMPUTE WS-RESP-DEL = FUNCTION NUMVAL(WS-RESP)
+             PERFORM VALIDATE-DELIVERY-METHOD
+           END-PERFORM.
+       
       **************************************************************************
 
