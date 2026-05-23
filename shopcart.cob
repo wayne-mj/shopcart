@@ -44,6 +44,8 @@
        01 WS-RESP-CDE-RNG  PIC X(1) VALUE 'N'.
        01 WS-RESP-DEL-RNG  PIC X(1) VALUE 'N'.
        01 WS-RESP-NUM      PIC 9(2).
+       01 WS-SHIP-FEE      PIC 9(2)v99.
+       01 WS-COST          PIC 9(5)v99.
        
       * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
@@ -374,4 +376,20 @@
            END-PERFORM.
        
       **************************************************************************
+      * Calculate the shipping fee
+       CALC-SHIPPING-FEE.
+           IF WS-RESP-QNT GREATER 1 THEN
+             COMPUTE WS-SHIP-FEE = 2.00 + ((WS-RESP-QNT - 1 ) * 1.6)
+           ELSE
+             MOVE 2.00 TO WS-SHIP-FEE
+           END-IF.
+      
+      **************************************************************************
+      * Calculate the total cost of the product
+       CALC-PRODUCT-COST.
+           COMPUTE WS-COST = (WS-RESP-QNT * SHD-PRICE) + WS-SHIP-FEE
 
+           IF SHD-MEMBER = 'YES' THEN
+             COMPUTE WS-COST = WS-COST * (90/100)
+           END-IF.
+       
