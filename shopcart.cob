@@ -46,6 +46,7 @@
        01 WS-RESP-NUM      PIC 9(2).
        01 WS-SHIP-FEE      PIC 9(2)v99.
        01 WS-COST          PIC 9(5)v99.
+       01 WS-PRICE         PIC 9(5)v99.
        
       * Data structures for catalogue including temporary counter
        01 HOMEWARECITY-STORAGE.
@@ -105,16 +106,30 @@
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
            
-      *    PERFORM UNTIL WS-RESP-MEM EQUAL 3
-      **      MOVE 0 TO WS-RESP-NUM
-      **      MOVE SPACES TO SHD-MEMBER
-      *      PERFORM ASK-FOR-MEMBER
-      *      DISPLAY WS-RESP-MEM
-      *      DISPLAY SHD-MEMBER             
-      *    END-PERFORM
+           PERFORM UNTIL WS-RESP-MEM EQUAL 3
+      *      MOVE 0 TO WS-RESP-NUM
+      *      MOVE SPACES TO SHD-MEMBER
+             PERFORM ASK-FOR-MEMBER
+             IF WS-RESP-MEM NOT EQUAL 3 THEN
+               PERFORM ASK-FOR-PRODUCT-CODE
+               PERFORM ASK-FOR-QUANTITY
+               PERFORM ASK-FOR-DELIVERY-METHOD
+               PERFORM CALC-SHIPPING-FEE
+               PERFORM CALC-PRODUCT-COST
+               DISPLAY SHD-MEMBER WS-GAP
+                       SHD-CODE WS-GAP
+                       SHD-PRODUCT WS-GAP
+                       WS-PRICE WS-GAP
+                       WS-RESP-QNT WS-GAP
+                       SHD-SHIP WS-GAP
+                       WS-SHIP-FEE WS-GAP
+                       WS-COST WS-GAP
 
-           PERFORM ASK-FOR-PRODUCT-CODE
-           PERFORM ASK-FOR-QUANTITY
+             END-IF
+           END-PERFORM
+
+      *    PERFORM ASK-FOR-PRODUCT-CODE
+      *    PERFORM ASK-FOR-QUANTITY
       *    MOVE 1 TO WS-RESP-CDE
       *    PERFORM SEARCH-PRODUCT-CODE
       *    DISPLAY SHD-CODE WS-GAP
@@ -299,7 +314,7 @@
                IF SC-CODE(HWC-SC-CODE) EQUAL WS-RESP-CDE THEN
                  MOVE SC-CODE(HWC-SC-CODE) TO SHD-CODE
                  MOVE SC-PRODUCT(HWC-SC-CODE) TO SHD-PRODUCT
-                 MOVE SC-PRICE(HWC-SC-CODE) TO SHD-PRICE
+                 MOVE SC-PRICE(HWC-SC-CODE) TO WS-PRICE
                  EXIT PERFORM
                ELSE
                  ADD 1 TO HWC-SC-CODE
@@ -387,9 +402,11 @@
       **************************************************************************
       * Calculate the total cost of the product
        CALC-PRODUCT-COST.
-           COMPUTE WS-COST = (WS-RESP-QNT * SHD-PRICE) + WS-SHIP-FEE
+           COMPUTE WS-COST = (WS-RESP-QNT * WS-PRICE) + WS-SHIP-FEE
 
            IF SHD-MEMBER = 'YES' THEN
              COMPUTE WS-COST = WS-COST * (90/100)
            END-IF.
+
+      **************************************************************************
        
