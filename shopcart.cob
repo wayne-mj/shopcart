@@ -310,21 +310,21 @@
       * Poor man's search of the catalogue
        SEARCH-PRODUCT-CODE.
       * Initialise the variables to a known state before using or returning
-           MOVE 1 TO HWC-SC-CODE
+           MOVE 1 TO HWC-SC-INDEX
            MOVE 0 TO SHD-CODE
            MOVE "No such product" TO SHD-PRODUCT
            MOVE 0 TO SHD-PRICE
 
       * Ironically, everything starts at 1, so we need to count until after 40
       * exiting the loop when there is a match else increment
-           PERFORM UNTIL HWC-SC-CODE GREATER THAN 40
-               IF SC-CODE(HWC-SC-CODE) EQUAL WS-RESP-CDE THEN
-                 MOVE SC-CODE(HWC-SC-CODE) TO SHD-CODE
-                 MOVE SC-PRODUCT(HWC-SC-CODE) TO SHD-PRODUCT
-                 MOVE SC-PRICE(HWC-SC-CODE) TO WS-PRICE
+           PERFORM UNTIL HWC-SC-INDEX GREATER THAN 40
+               IF SC-CODE(HWC-SC-INDEX) EQUAL WS-RESP-CDE THEN
+                 MOVE SC-CODE(HWC-SC-INDEX) TO SHD-CODE
+                 MOVE SC-PRODUCT(HWC-SC-INDEX) TO SHD-PRODUCT
+                 MOVE SC-PRICE(HWC-SC-INDEX) TO WS-PRICE
                  EXIT PERFORM
                ELSE
-                 ADD 1 TO HWC-SC-CODE
+                 ADD 1 TO HWC-SC-INDEX
                END-IF               
            END-PERFORM.           
 
