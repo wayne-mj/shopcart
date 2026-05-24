@@ -33,6 +33,7 @@
        01 WS-MAX-CART  PIC 9(4) VALUE 9999.
       * Column count for table view of catalogue   
        01 WS-COLS          PIC 9(1) VALUE 0.
+       01 WS-COLS-INDEX    PIC 9(1) VALUE 0.
       * Variable for responses for console input
        01 WS-RESP          PIC X(5).
       * Temporary variables
@@ -52,7 +53,7 @@
        01 HOMEWARECITY-STORAGE.
       * This is the index for the array/table
       * HWC-SC-CODE: Shop Catalogue Code
-           05 HWC-SC-CODE   PIC 9(2) VALUE 0.
+           05 HWC-SC-CODE   PIC 9(2) VALUE 1.
            05 HWC-SC-INDEX  PIC 9(2) VALUE 1.
       * This is the array/table for the catalogue.  It does not work the
       * the same as other programming languages.
@@ -173,7 +174,7 @@
       *          ADD 1 TO HWC-SC-CODE
       * Assign the product code to the table
                  MOVE HWC-SC-INDEX TO HWC-SC-CODE
-                 COMPUTE HWC-SC-CODE = HWC-SC-CODE - 1
+      *          COMPUTE HWC-SC-CODE = HWC-SC-CODE - 1
                  MOVE HWC-SC-CODE TO SC-CODE(HWC-SC-INDEX)
       * As the values are are separated by ',' they need to be split
       * and moved into the table
@@ -254,9 +255,9 @@
       * from the original as it is pretty obvious what is going on.
        DISPLAY-CAT-HEADER.
            MOVE 0 TO WS-COLS
-           MOVE 0 TO HWC-SC-CODE
-           PERFORM UNTIL HWC-SC-CODE IS EQUAL 2
-             ADD 1 TO HWC-SC-CODE
+           MOVE 0 TO WS-COLS-INDEX
+           PERFORM UNTIL WS-COLS-INDEX IS EQUAL 2
+      *      ADD 1 TO WS-COLS-INDEX
              IF WS-COLS EQUAL 0 THEN
                DISPLAY CH-CODE WS-GAP
                        CH-PRODUCT WS-GAP
@@ -271,6 +272,7 @@
              IF WS-COLS EQUAL 2 THEN
                MOVE 0 TO WS-COLS
              END-IF
+             ADD 1 TO WS-COLS-INDEX
            END-PERFORM.
        
       **************************************************************************
