@@ -363,6 +363,9 @@
              ACCEPT WS-RESP
              COMPUTE WS-RESP-CDE = FUNCTION NUMVAL(WS-RESP)
              PERFORM VALIDATE-PRODUCT-CODE
+             IF WS-RESP-CDE-RNG EQUAL 'Y' THEN
+               PERFORM SEARCH-PRODUCT-CODE
+             END-IF
            END-PERFORM.
 
       **************************************************************************
@@ -388,6 +391,13 @@
              ACCEPT WS-RESP
              COMPUTE WS-RESP-DEL = FUNCTION NUMVAL(WS-RESP)
              PERFORM VALIDATE-DELIVERY-METHOD
+             IF WS-RESP-DEL-RNG EQUAL 'Y' THEN
+               IF WS-RESP-DEL EQUAL 1 THEN
+                 MOVE "DELIVERY" TO SHD-SHIP
+               ELSE
+                 MOVE "PICK-UP" TO SHD-SHIP
+               END-IF
+             END-IF
            END-PERFORM.
        
       **************************************************************************
