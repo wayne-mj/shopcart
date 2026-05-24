@@ -53,6 +53,7 @@
       * This is the index for the array/table
       * HWC-SC-CODE: Shop Catalogue Code
            05 HWC-SC-CODE   PIC 9(2) VALUE 0.
+           05 HWC-SC-INDEX  PIC 9(2) VALUE 1.
       * This is the array/table for the catalogue.  It does not work the
       * the same as other programming languages.
            05 SHOP-CATALOGUE OCCURS 40 TIMES.
@@ -105,28 +106,28 @@
        PROCEDURE DIVISION.
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
-           
-           PERFORM UNTIL WS-RESP-MEM EQUAL 3
-      *      MOVE 0 TO WS-RESP-NUM
-      *      MOVE SPACES TO SHD-MEMBER
-             PERFORM ASK-FOR-MEMBER
-             IF WS-RESP-MEM NOT EQUAL 3 THEN
-               PERFORM ASK-FOR-PRODUCT-CODE
-               PERFORM ASK-FOR-QUANTITY
-               PERFORM ASK-FOR-DELIVERY-METHOD
-               PERFORM CALC-SHIPPING-FEE
-               PERFORM CALC-PRODUCT-COST
-               DISPLAY SHD-MEMBER WS-GAP
-                       SHD-CODE WS-GAP
-                       SHD-PRODUCT WS-GAP
-                       WS-PRICE WS-GAP
-                       WS-RESP-QNT WS-GAP
-                       SHD-SHIP WS-GAP
-                       WS-SHIP-FEE WS-GAP
-                       WS-COST WS-GAP
-
-             END-IF
-           END-PERFORM
+           PERFORM DISPLAY-CAT
+      *    PERFORM UNTIL WS-RESP-MEM EQUAL 3
+      **      MOVE 0 TO WS-RESP-NUM
+      **      MOVE SPACES TO SHD-MEMBER
+      *      PERFORM ASK-FOR-MEMBER
+      *      IF WS-RESP-MEM NOT EQUAL 3 THEN
+      *        PERFORM ASK-FOR-PRODUCT-CODE
+      *        PERFORM ASK-FOR-QUANTITY
+      *        PERFORM ASK-FOR-DELIVERY-METHOD
+      *        PERFORM CALC-SHIPPING-FEE
+      *        PERFORM CALC-PRODUCT-COST
+      *        DISPLAY SHD-MEMBER WS-GAP
+      *                SHD-CODE WS-GAP
+      *                SHD-PRODUCT WS-GAP
+      *                WS-PRICE WS-GAP
+      *                WS-RESP-QNT WS-GAP
+      *                SHD-SHIP WS-GAP
+      *                WS-SHIP-FEE WS-GAP
+      *                WS-COST WS-GAP
+      *
+      *      END-IF
+      *    END-PERFORM
 
       *    PERFORM ASK-FOR-PRODUCT-CODE
       *    PERFORM ASK-FOR-QUANTITY
@@ -160,7 +161,6 @@
       * Build catalogue from CSV file
        BUILD-CAT.
       * Open the CSV file for input
-      *    MOVE 0 to HWC-SC-CODE
            OPEN INPUT CSV-FILE.
       * Until the EOF 'boolean' has been set keep reading
            PERFORM UNTIL WS-EOF='Y'
@@ -170,17 +170,22 @@
                NOT AT END
       * This is the catalogue being built as it is read from the file
       * Increment the product code
-                 ADD 1 TO HWC-SC-CODE
+      *          ADD 1 TO HWC-SC-CODE
       * Assign the product code to the table
-                 MOVE HWC-SC-CODE TO SC-CODE(HWC-SC-CODE)
+                 MOVE HWC-SC-INDEX TO HWC-SC-CODE
+                 COMPUTE HWC-SC-CODE = HWC-SC-CODE - 1
+                 MOVE HWC-SC-CODE TO SC-CODE(HWC-SC-INDEX)
       * As the values are are separated by ',' they need to be split
       * and moved into the table
                  UNSTRING CSV-RECORD
                    DELIMITED BY ','
                    INTO     
-                     SC-PRODUCT(HWC-SC-CODE)
-                     SC-PRICE(HWC-SC-CODE)
+                     SC-PRODUCT(HWC-SC-INDEX)
+                     SC-PRICE(HWC-SC-INDEX)
+                 ADD 1 TO HWC-SC-INDEX
+      *          DISPLAY "(R) HWC-SC-CODE: " HWC-SC-CODE
              END-READ
+             
            END-PERFORM
       * Close the file
            CLOSE CSV-FILE.
@@ -189,14 +194,14 @@
       * Testing that the catalogue has been created and can be displayed.
        TEST-DISPLAY-CAT.
       * Reset the counter to 0 to
-           MOVE 1 TO HWC-SC-CODE
+           MOVE 1 TO HWC-SC-INDEX
       * Iterate through table   
-           PERFORM UNTIL HWC-SC-CODE IS GREATER THAN 40
+           PERFORM UNTIL HWC-SC-INDEX IS GREATER THAN 40
              
-             DISPLAY SC-CODE(HWC-SC-CODE) " "
-                     SC-PRODUCT(HWC-SC-CODE) " "
-                     SC-PRICE(HWC-SC-CODE)
-             ADD 1 TO HWC-SC-CODE
+             DISPLAY SC-CODE(HWC-SC-INDEX) " "
+                     SC-PRODUCT(HWC-SC-INDEX) " "
+                     SC-PRICE(HWC-SC-INDEX)
+             ADD 1 TO HWC-SC-INDEX
            END-PERFORM.
        
       **************************************************************************
@@ -208,28 +213,28 @@
       * Display the header for the catalogue
            PERFORM DISPLAY-CAT-HEADER
       * Set the index for 0
-           MOVE 1 TO HWC-SC-CODE
+           MOVE 1 TO HWC-SC-INDEX
       * Set the columns to 0
            MOVE 0 TO WS-COLS
       * Loop through the table
-           PERFORM UNTIL HWC-SC-CODE IS GREATER THAN 40
+           PERFORM UNTIL HWC-SC-INDEX IS GREATER THAN 40
 
       * If the columns is the first
              IF WS-COLS EQUAL 0 THEN
       * Move the table to the displayable variables and then display
       * without a newline
-               MOVE SC-CODE(HWC-SC-CODE) TO SCD-DISP-CODE
-               MOVE SC-PRODUCT(HWC-SC-CODE) TO SCD-DISP-PROD
-               MOVE SC-PRICE(HWC-SC-CODE) TO SCD-DISP-PRICE
+               MOVE SC-CODE(HWC-SC-INDEX) TO SCD-DISP-CODE
+               MOVE SC-PRODUCT(HWC-SC-INDEX) TO SCD-DISP-PROD
+               MOVE SC-PRICE(HWC-SC-INDEX) TO SCD-DISP-PRICE
                DISPLAY SCD-DISP-CODE WS-GAP
                        SCD-DISP-PROD WS-GAP
                        SCD-DISP-PRICE WS-GAP
                        WITH NO ADVANCING
       * Otherwise just move the displayable variables and display them
              ELSE
-               MOVE SC-CODE(HWC-SC-CODE) TO SCD-DISP-CODE
-               MOVE SC-PRODUCT(HWC-SC-CODE) TO SCD-DISP-PROD
-               MOVE SC-PRICE(HWC-SC-CODE) TO SCD-DISP-PRICE
+               MOVE SC-CODE(HWC-SC-INDEX) TO SCD-DISP-CODE
+               MOVE SC-PRODUCT(HWC-SC-INDEX) TO SCD-DISP-PROD
+               MOVE SC-PRICE(HWC-SC-INDEX) TO SCD-DISP-PRICE
                DISPLAY SCD-DISP-CODE WS-GAP
                        SCD-DISP-PROD WS-GAP
                        SCD-DISP-PRICE WS-GAP
@@ -241,7 +246,7 @@
                MOVE 0 TO WS-COLS
              END-IF
       * Increment the index counter
-             ADD 1 TO HWC-SC-CODE
+             ADD 1 TO HWC-SC-INDEX
            END-PERFORM.
              
       **************************************************************************
