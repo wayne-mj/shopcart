@@ -13,6 +13,9 @@
            SELECT CSV-FILE ASSIGN TO "product.csv"
              ORGANIZATION IS LINE SEQUENTIAL.
 
+           SELECT CSV-FILE2 ASSIGN TO "shopcart.csv"
+             ORGANIZATION IS LINE SEQUENTIAL.
+
        DATA DIVISION.
        FILE SECTION.
       * File descriptor for CSV file
@@ -20,15 +23,20 @@
       * Each line should be no longer that 80 characters long
        01 CSV-RECORD PIC X(80).
        
+      * File descriptor for order CSV file
+       FD  CSV-FILE2.
+      * Each line should be no longer that 80 characters long
+       01  CSV-RECORD2 PIC X(80).
+
        WORKING-STORAGE SECTION.
       ******************************************************************
       * Read from CSV File 
        01 WS-EOF PIC X(1) VALUE 'N'.
       ******************************************************************
       * Gap between columns
-       01 WS-GAP       PIC X(4) VALUE SPACES.
+       01 WS-GAP           PIC X(4) VALUE SPACES.
       * Counter for the Shopping Cart List
-       01 WS-CART      PIC 9(4) VALUE 0.
+       01 WS-CART          PIC 9(4) VALUE 0.
       * Max shopping cart size
        01 WS-CART-COUNT    PIC 9(4) VALUE 0.
       * Column count for table view of catalogue   
@@ -68,9 +76,9 @@
              10 SCD-DISP-PRICE PIC Z(5).99.
       * Variables for the catalogue headers   
            05 CATALOGUE-HEADERS.
-             10 CH-CODE PIC X(4) VALUE "CODE".
-             10 CH-PRODUCT PIC X(35) VALUE "PRODUCT NAME".
-             10 CH-PRICE PIC X(7) VALUE "$ PRICE".
+             10 CH-CODE     PIC X(4)    VALUE "CODE".
+             10 CH-PRODUCT  PIC X(35)   VALUE "PRODUCT NAME".
+             10 CH-PRICE    PIC X(7)    VALUE "$ PRICE".
       * Variables for the shopping cart list header    
            05 SHOPPING-CART-HEADERS.
              10 SH-MEMBER   PIC X(10)   VALUE "MEMBERSHIP".
@@ -155,8 +163,26 @@
              
            END-PERFORM
       * Close the file
-           CLOSE CSV-FILE.
-       
+           CLOSE CSV-FILE
+           MOVE 'N' TO WS-EOF.
+
+      **************************************************************************
+       BUILD-SHOPPING-CART-CSV.
+           OPEN INPUT CSV-FILE2.
+           PERFORM UNTIL WS-EOF EQUAL 'Y'
+             READ CSV-FILE2
+               AT END MOVE 'Y' TO WS-EOF
+               NOT AT END
+                 UNSTRING CSV-RECORD2 
+                   DELIMITED BY ','
+                   INTO 
+                     WS-RESP-MEM
+                     WS-RESP-CDE
+                     WS-RESP-QNT
+                     WS-RESP-DEL
+             END-READ
+           END-PERFORM.
+
       **************************************************************************
       * Testing that the catalogue has been created and can be displayed.
        TEST-DISPLAY-CAT.
@@ -259,6 +285,23 @@
       * Get the response and convert it to a number if possible
              ACCEPT WS-RESP
              COMPUTE WS-RESP-MEM = FUNCTION NUMVAL(WS-RESP)
+             PERFORM EVALUATE-MEMBER
+      ** Perform a test of the number response: 1, 2 or 3 and assign
+      ** accordingly or if necessary display an error message
+      *      IF WS-RESP-MEM EQUAL 1 THEN
+      *        MOVE "YES" TO SHD-MEMBER
+      *      END-IF
+      *      IF WS-RESP-MEM EQUAL 2 THEN
+      *          MOVE "NO" TO SHD-MEMBER
+      *      END-IF
+      *      IF WS-RESP-MEM GREATER 3 OR WS-RESP-MEM LESS 1 THEN
+      *          DISPLAY "INVALID OPTION"
+      *      END-IF
+           END-PERFORM.
+
+      **************************************************************************
+      * Evaluate if the customer is a member or not, or if to terminate input
+       EVALUATE-MEMBER.
       * Perform a test of the number response: 1, 2 or 3 and assign
       * accordingly or if necessary display an error message
              IF WS-RESP-MEM EQUAL 1 THEN
@@ -268,10 +311,46 @@
                  MOVE "NO" TO SHD-MEMBER
              END-IF
              IF WS-RESP-MEM GREATER 3 OR WS-RESP-MEM LESS 1 THEN
-                 DISPLAY "INVALID OPTION"
-             END-IF
+                 DISPLAY "INVALID MEMBER OPTION"
+             END-IF.
+      
+      **************************************************************************
+      * Ask the user for the product code
+       ASK-FOR-PRODUCT-CODE.
+           MOVE 'N' TO WS-RESP-CDE-RNG
+           PERFORM DISPLAY-CAT
+      * Loop until the user gets it right
+           PERFORM UNTIL WS-RESP-CDE-RNG EQUAL 'Y'
+             DISPLAY " "
+             DISPLAY "ENTER A PRODUCT CODE (1-40): "
+               WITH NO ADVANCING
+             ACCEPT WS-RESP
+             COMPUTE WS-RESP-CDE = FUNCTION NUMVAL(WS-RESP)
+             PERFORM EVALUATE-PRODUCT-CODE
+      *      PERFORM VALIDATE-PRODUCT-CODE
+      *      IF WS-RESP-CDE-RNG EQUAL 'Y' THEN
+      *        PERFORM SEARCH-PRODUCT-CODE
+      *      END-IF
            END-PERFORM.
       
+      **************************************************************************
+      * Evaluate the product code and if valid execute the search
+       EVALUATE-PRODUCT-CODE.
+           PERFORM VALIDATE-PRODUCT-CODE
+           IF WS-RESP-CDE-RNG EQUAL 'Y' THEN
+             PERFORM SEARCH-PRODUCT-CODE
+           END-IF.
+      
+      **************************************************************************
+      * Validate the product code range is between inclusively 1 and 40
+      * and set the 'boolean' appropriately.
+       VALIDATE-PRODUCT-CODE.
+           IF WS-RESP-CDE GREATER 0 AND WS-RESP-CDE LESS 41 THEN
+             MOVE 'Y' TO WS-RESP-CDE-RNG
+           ELSE
+             MOVE 'N' TO WS-RESP-CDE-RNG
+           END-IF.  
+
       **************************************************************************
       * Poor man's search of the catalogue
        SEARCH-PRODUCT-CODE.
@@ -293,28 +372,29 @@
                ELSE
                  ADD 1 TO HWC-SC-INDEX
                END-IF               
-           END-PERFORM.           
-
-      **************************************************************************
-      * Validate the product code range is between inclusively 1 and 40
-      * and set the 'boolean' appropriately.
-       VALIDATE-PRODUCT-CODE.
-           IF WS-RESP-CDE GREATER 0 AND WS-RESP-CDE LESS 41 THEN
-             MOVE 'Y' TO WS-RESP-CDE-RNG
-           ELSE
-             MOVE 'N' TO WS-RESP-CDE-RNG
-           END-IF.            
+           END-PERFORM.
       
       **************************************************************************
-      * Validate the delivery methods is between 1 and 2 inclusively and
-      * set the 'boolean' appropriately.
-       VALIDATE-DELIVERY-METHOD.
-           IF WS-RESP-DEL GREATER 0 AND WS-RESP-DEL LESS 3 THEN
-             MOVE 'Y' TO WS-RESP-DEL-RNG
-           ELSE
-             MOVE 'N' TO WS-RESP-DEL-RNG
-           END-IF.
+      * Ask the user for the quantity of the product
+       ASK-FOR-QUANTITY.
+           MOVE 'N' TO WS-RESP-QNT-RNG
+           PERFORM UNTIL WS-RESP-QNT-RNG EQUAL 'Y'
+             DISPLAY " "
+             DISPLAY "ENTER THE QUANTITY OF PRODUCT (1-29): "
+               WITH NO ADVANCING
+             ACCEPT WS-RESP
+             COMPUTE WS-RESP-QNT = FUNCTION NUMVAL(WS-RESP)
+             PERFORM EVALUATE-QUANTITY
+      *      PERFORM VALIDATE-QUANTITY
+      *      MOVE WS-RESP-QNT TO SHD-QUANT
+           END-PERFORM.
+      
+      **************************************************************************
 
+       EVALUATE-QUANTITY.
+           PERFORM VALIDATE-QUANTITY
+           MOVE WS-RESP-QNT TO SHD-QUANT.
+      
       **************************************************************************
       * Validate that the quantity chosen is between the inclusive ranges
       * 1 and 29 and return the appropriate 'boolean' response.
@@ -326,38 +406,6 @@
            END-IF.           
       
       **************************************************************************
-      * Ask the user for the product code
-       ASK-FOR-PRODUCT-CODE.
-           MOVE 'N' TO WS-RESP-CDE-RNG
-           PERFORM DISPLAY-CAT
-      * Loop until the user gets it right
-           PERFORM UNTIL WS-RESP-CDE-RNG EQUAL 'Y'
-             DISPLAY " "
-             DISPLAY "ENTER A PRODUCT CODE (1-40): "
-               WITH NO ADVANCING
-             ACCEPT WS-RESP
-             COMPUTE WS-RESP-CDE = FUNCTION NUMVAL(WS-RESP)
-             PERFORM VALIDATE-PRODUCT-CODE
-             IF WS-RESP-CDE-RNG EQUAL 'Y' THEN
-               PERFORM SEARCH-PRODUCT-CODE
-             END-IF
-           END-PERFORM.
-
-      **************************************************************************
-      * Ask the user for the quantity of the product
-       ASK-FOR-QUANTITY.
-           MOVE 'N' TO WS-RESP-QNT-RNG
-           PERFORM UNTIL WS-RESP-QNT-RNG EQUAL 'Y'
-             DISPLAY " "
-             DISPLAY "ENTER THE QUANTITY OF PRODUCT (1-29): "
-               WITH NO ADVANCING
-             ACCEPT WS-RESP
-             COMPUTE WS-RESP-QNT = FUNCTION NUMVAL(WS-RESP)
-             PERFORM VALIDATE-QUANTITY
-             MOVE WS-RESP-QNT TO SHD-QUANT
-           END-PERFORM.
-
-      **************************************************************************
       * Ask for the delivery method
        ASK-FOR-DELIVERY-METHOD.
            MOVE 'N' TO WS-RESP-DEL-RNG
@@ -368,16 +416,39 @@
                WITH NO ADVANCING
              ACCEPT WS-RESP
              COMPUTE WS-RESP-DEL = FUNCTION NUMVAL(WS-RESP)
-             PERFORM VALIDATE-DELIVERY-METHOD
+             PERFORM EVALUATE-DELIVERY-METHOD
+      *      PERFORM VALIDATE-DELIVERY-METHOD
+      *      IF WS-RESP-DEL-RNG EQUAL 'Y' THEN
+      *        IF WS-RESP-DEL EQUAL 1 THEN
+      *          MOVE "DELIVERY" TO SHD-SHIP
+      *        ELSE
+      *          MOVE "PICK-UP" TO SHD-SHIP
+      *        END-IF
+      *      END-IF
+           END-PERFORM.
+      
+      **************************************************************************
+
+       EVALUATE-DELIVERY-METHOD.
+           PERFORM VALIDATE-DELIVERY-METHOD
              IF WS-RESP-DEL-RNG EQUAL 'Y' THEN
                IF WS-RESP-DEL EQUAL 1 THEN
                  MOVE "DELIVERY" TO SHD-SHIP
                ELSE
                  MOVE "PICK-UP" TO SHD-SHIP
                END-IF
-             END-IF
-           END-PERFORM.
-       
+             END-IF.
+
+      **************************************************************************
+      * Validate the delivery methods is between 1 and 2 inclusively and
+      * set the 'boolean' appropriately.
+       VALIDATE-DELIVERY-METHOD.
+           IF WS-RESP-DEL GREATER 0 AND WS-RESP-DEL LESS 3 THEN
+             MOVE 'Y' TO WS-RESP-DEL-RNG
+           ELSE
+             MOVE 'N' TO WS-RESP-DEL-RNG
+           END-IF.
+           
       **************************************************************************
       * Calculate the shipping fee
        CALC-SHIPPING-FEE.
