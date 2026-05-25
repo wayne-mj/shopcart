@@ -95,66 +95,32 @@
            05 SHOPPING-CART-LIST OCCURS 1 TO 9999 TIMES
                 DEPENDING ON WS-CART
                 INDEXED BY CART-INDEX.
-             10 SCL-MEMBER   PIC X(10).
-             10 SCL-CODE     PIC X(4).
+             10 SCL-MEMBER   PIC X(3).
+             10 SCL-CODE     PIC 9(4).
              10 SCL-PRODUCT  PIC X(35).
-             10 SCL-PRICE    PIC X(7).
-             10 SCL-QUANT    PIC X(8).
+             10 SCL-PRICE    PIC 9(5)v9.
+             10 SCL-QUANT    PIC 9(2).
              10 SCL-SHIP     PIC X(15).
-             10 SCL-FEE      PIC X(12).
-             10 SCL-COST     PIC X(7).
+             10 SCL-FEE      PIC 9(5)v9.
+             10 SCL-COST     PIC 9(5)v99.
 
        PROCEDURE DIVISION.
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
-           PERFORM DISPLAY-CAT
-      *    PERFORM UNTIL WS-RESP-MEM EQUAL 3
-      **      MOVE 0 TO WS-RESP-NUM
-      **      MOVE SPACES TO SHD-MEMBER
-      *      PERFORM ASK-FOR-MEMBER
-      *      IF WS-RESP-MEM NOT EQUAL 3 THEN
-      *        PERFORM ASK-FOR-PRODUCT-CODE
-      *        PERFORM ASK-FOR-QUANTITY
-      *        PERFORM ASK-FOR-DELIVERY-METHOD
-      *        PERFORM CALC-SHIPPING-FEE
-      *        PERFORM CALC-PRODUCT-COST
-      *        DISPLAY SHD-MEMBER WS-GAP
-      *                SHD-CODE WS-GAP
-      *                SHD-PRODUCT WS-GAP
-      *                WS-PRICE WS-GAP
-      *                WS-RESP-QNT WS-GAP
-      *                SHD-SHIP WS-GAP
-      *                WS-SHIP-FEE WS-GAP
-      *                WS-COST WS-GAP
-      *
-      *      END-IF
-      *    END-PERFORM
 
-      *    PERFORM ASK-FOR-PRODUCT-CODE
-      *    PERFORM ASK-FOR-QUANTITY
-      *    MOVE 1 TO WS-RESP-CDE
-      *    PERFORM SEARCH-PRODUCT-CODE
-      *    DISPLAY SHD-CODE WS-GAP
-      *            SHD-PRODUCT WS-GAP
-      *            SHD-PRICE WS-GAP
-      *
-      *    MOVE 40 TO WS-RESP-CDE 
-      *    PERFORM SEARCH-PRODUCT-CODE
-      *    DISPLAY SHD-CODE WS-GAP
-      *            SHD-PRODUCT WS-GAP
-      *            SHD-PRICE WS-GAP
-      *    
-      *    MOVE 5 TO WS-RESP-CDE 
-      *    PERFORM SEARCH-PRODUCT-CODE
-      *    DISPLAY SHD-CODE WS-GAP
-      *            SHD-PRODUCT WS-GAP
-      *            SHD-PRICE WS-GAP
-      *
-      *    MOVE 50 TO WS-RESP-CDE 
-      *    PERFORM SEARCH-PRODUCT-CODE
-      *    DISPLAY SHD-CODE WS-GAP
-      *            SHD-PRODUCT WS-GAP
-      *            SHD-PRICE WS-GAP
+      * Start building the shopping cart by asking if the customer is a member 
+      * or not, or if terminate input.
+           PERFORM UNTIL WS-RESP-MEM EQUAL 3
+      * Reset to defaults
+             MOVE 0 TO WS-RESP-NUM
+             MOVE SPACES TO SHD-MEMBER
+             PERFORM ASK-FOR-MEMBER
+      * If this is not the end, then build the cart
+             IF WS-RESP-MEM NOT EQUAL 3 THEN
+               PERFORM BUILD-SHOPPING-CART
+
+             END-IF
+           END-PERFORM
 
            STOP RUN.
 
@@ -322,6 +288,7 @@
                  MOVE SC-CODE(HWC-SC-INDEX) TO SHD-CODE
                  MOVE SC-PRODUCT(HWC-SC-INDEX) TO SHD-PRODUCT
                  MOVE SC-PRICE(HWC-SC-INDEX) TO WS-PRICE
+                 MOVE WS-PRICE TO SHD-PRICE
                  EXIT PERFORM
                ELSE
                  ADD 1 TO HWC-SC-INDEX
@@ -361,6 +328,7 @@
       **************************************************************************
       * Ask the user for the product code
        ASK-FOR-PRODUCT-CODE.
+           MOVE 'N' TO WS-RESP-CDE-RNG
            PERFORM DISPLAY-CAT
       * Loop until the user gets it right
            PERFORM UNTIL WS-RESP-CDE-RNG EQUAL 'Y'
@@ -378,6 +346,7 @@
       **************************************************************************
       * Ask the user for the quantity of the product
        ASK-FOR-QUANTITY.
+           MOVE 'N' TO WS-RESP-QNT-RNG
            PERFORM UNTIL WS-RESP-QNT-RNG EQUAL 'Y'
              DISPLAY " "
              DISPLAY "ENTER THE QUANTITY OF PRODUCT (1-29): "
@@ -385,11 +354,13 @@
              ACCEPT WS-RESP
              COMPUTE WS-RESP-QNT = FUNCTION NUMVAL(WS-RESP)
              PERFORM VALIDATE-QUANTITY
+             MOVE WS-RESP-QNT TO SHD-QUANT
            END-PERFORM.
 
       **************************************************************************
       * Ask for the delivery method
        ASK-FOR-DELIVERY-METHOD.
+           MOVE 'N' TO WS-RESP-DEL-RNG
            PERFORM UNTIL WS-RESP-DEL-RNG EQUAL 'Y'
              DISPLAY " "
              DISPLAY "ENTER THE DELIVERY METHOD"
@@ -410,6 +381,7 @@
       **************************************************************************
       * Calculate the shipping fee
        CALC-SHIPPING-FEE.
+           MOVE 0 TO WS-SHIP-FEE
            IF WS-RESP-QNT GREATER 1 THEN
              COMPUTE WS-SHIP-FEE = 2.00 + ((WS-RESP-QNT - 1 ) * 1.6)
            ELSE
@@ -419,6 +391,7 @@
       **************************************************************************
       * Calculate the total cost of the product
        CALC-PRODUCT-COST.
+           MOVE 0 TO WS-COST
            COMPUTE WS-COST = (WS-RESP-QNT * WS-PRICE) + WS-SHIP-FEE
 
            IF SHD-MEMBER = 'YES' THEN
@@ -427,3 +400,36 @@
 
       **************************************************************************
        
+      * Build the shopping cart based ont he input from the user
+       BUILD-SHOPPING-CART.
+      * Ensure the variables are blanked and zeroed out before proceeding
+      *    MOVE SPACES TO SHD-MEMBER
+           MOVE 0 TO SHD-CODE
+           MOVE SPACES TO SHD-PRODUCT
+           MOVE 0 TO SHD-PRICE
+           MOVE 0 TO SHD-QUANT
+           MOVE SPACES TO SHD-SHIP
+           MOVE 0 TO SHD-FEE
+           MOVE 0 TO SHD-COST
+
+           PERFORM ASK-FOR-PRODUCT-CODE
+           PERFORM ASK-FOR-QUANTITY           
+           PERFORM ASK-FOR-DELIVERY-METHOD
+           PERFORM CALC-SHIPPING-FEE
+           MOVE WS-SHIP-FEE TO SHD-FEE
+           PERFORM CALC-PRODUCT-COST
+           MOVE WS-COST TO SHD-COST
+
+      *    DISPLAY SHD-MEMBER WS-GAP
+      *            SHD-CODE WS-GAP
+      *            SHD-PRODUCT WS-GAP
+      *            SHD-PRICE WS-GAP
+      *            SHD-QUANT WS-GAP
+      *            SHD-SHIP WS-GAP
+      *            SHD-FEE WS-GAP
+      *            SHD-COST WS-GAP
+           .
+      
+      **************************************************************************
+
+
