@@ -30,7 +30,7 @@
       * Counter for the Shopping Cart List
        01 WS-CART      PIC 9(4) VALUE 0.
       * Max shopping cart size
-       01 WS-MAX-CART  PIC 9(4) VALUE 9999.
+       01 WS-CART-COUNT    PIC 9(4) VALUE 0.
       * Column count for table view of catalogue   
        01 WS-COLS          PIC 9(1) VALUE 0.
        01 WS-COLS-INDEX    PIC 9(1) VALUE 0.
@@ -60,12 +60,12 @@
            05 SHOP-CATALOGUE OCCURS 40 TIMES.
              10 SC-CODE PIC 9(2).
              10 SC-PRODUCT PIC X(35).
-             10 SC-PRICE PIC 9(3)V99.
+             10 SC-PRICE PIC 9(5)V99.
       * Display variants of the catalogue     
            05 SHOP-CAT-DISP.
              10 SCD-DISP-CODE PIC Z(4).
              10 SCD-DISP-PROD PIC X(35).
-             10 SCD-DISP-PRICE PIC Z(4).99.
+             10 SCD-DISP-PRICE PIC Z(5).99.
       * Variables for the catalogue headers   
            05 CATALOGUE-HEADERS.
              10 CH-CODE PIC X(4) VALUE "CODE".
@@ -86,11 +86,11 @@
              10 SHD-MEMBER   PIC X(10).
              10 SHD-CODE     PIC Z(4).
              10 SHD-PRODUCT  PIC X(35).
-             10 SHD-PRICE    PIC Z(4).99.
+             10 SHD-PRICE    PIC Z(5).99.
              10 SHD-QUANT    PIC Z(8).
              10 SHD-SHIP     PIC X(15).
              10 SHD-FEE      PIC Z(9).99.
-             10 SHD-COST     PIC Z(4).99.
+             10 SHD-COST     PIC Z(5).99.
       * Table for the shopping cart list
            05 SHOPPING-CART-LIST OCCURS 1 TO 9999 TIMES
                 DEPENDING ON WS-CART
@@ -98,16 +98,15 @@
              10 SCL-MEMBER   PIC X(3).
              10 SCL-CODE     PIC 9(4).
              10 SCL-PRODUCT  PIC X(35).
-             10 SCL-PRICE    PIC 9(5)v9.
+             10 SCL-PRICE    PIC 9(5)v99.
              10 SCL-QUANT    PIC 9(2).
              10 SCL-SHIP     PIC X(15).
-             10 SCL-FEE      PIC 9(5)v9.
+             10 SCL-FEE      PIC 9(5)v99.
              10 SCL-COST     PIC 9(5)v99.
 
        PROCEDURE DIVISION.
       * Build the catalogue from the CSV File
            PERFORM BUILD-CAT
-
       * Start building the shopping cart by asking if the customer is a member 
       * or not, or if terminate input.
            PERFORM UNTIL WS-RESP-MEM EQUAL 3
@@ -118,9 +117,10 @@
       * If this is not the end, then build the cart
              IF WS-RESP-MEM NOT EQUAL 3 THEN
                PERFORM BUILD-SHOPPING-CART
-
              END-IF
            END-PERFORM
+           
+           PERFORM DISPLAY-SHOPPING-CART
 
            STOP RUN.
 
@@ -408,10 +408,11 @@
            MOVE SPACES TO SHD-PRODUCT
            MOVE 0 TO SHD-PRICE
            MOVE 0 TO SHD-QUANT
-           MOVE SPACES TO SHD-SHIP
+      *    MOVE SPACES TO SHD-SHIP
            MOVE 0 TO SHD-FEE
            MOVE 0 TO SHD-COST
 
+      * Ask the user for their input and make the necessary assignments
            PERFORM ASK-FOR-PRODUCT-CODE
            PERFORM ASK-FOR-QUANTITY           
            PERFORM ASK-FOR-DELIVERY-METHOD
@@ -420,6 +421,19 @@
            PERFORM CALC-PRODUCT-COST
            MOVE WS-COST TO SHD-COST
 
+      * Create the table
+           MOVE FUNCTION TRIM(SHD-MEMBER) TO SCL-MEMBER(CART-INDEX)
+           MOVE SHD-CODE TO SCL-CODE(CART-INDEX)
+           MOVE FUNCTION TRIM(SHD-PRODUCT) TO SCL-PRODUCT(CART-INDEX)
+           MOVE SHD-PRICE TO SCL-PRICE(CART-INDEX)
+           MOVE SHD-QUANT TO SCL-QUANT(CART-INDEX)
+           MOVE SHD-SHIP TO SCL-SHIP(CART-INDEX)
+           MOVE SHD-FEE TO SCL-FEE(CART-INDEX)
+           MOVE SHD-COST TO SCL-COST(CART-INDEX)
+           
+      * Increment and store the current location of the counter
+           ADD 1 TO CART-INDEX
+           MOVE CART-INDEX TO WS-CART-COUNT
       *    DISPLAY SHD-MEMBER WS-GAP
       *            SHD-CODE WS-GAP
       *            SHD-PRODUCT WS-GAP
@@ -428,8 +442,50 @@
       *            SHD-SHIP WS-GAP
       *            SHD-FEE WS-GAP
       *            SHD-COST WS-GAP
-           .
+
+      * Monitor the current count and report when getting close to max
+           IF WS-CART-COUNT EQUAL 9000 THEN
+             DISPLAY "RECORD COUNT APPROACHING MAXIMUM: " WS-CART-COUNT
+                     " OF 9999."
+           END-IF.
       
       **************************************************************************
+      * Display the shopping cart after it has been put together
+       DISPLAY-SHOPPING-CART.
+      * Reset the cart index to 1
+           MOVE 1 TO CART-INDEX
+      * Reset the variables to their defaults states
+      *    MOVE SPACES TO SHD-MEMBER
+           MOVE 0 TO SHD-CODE
+           MOVE SPACES TO SHD-PRODUCT
+           MOVE 0 TO SHD-PRICE
+           MOVE 0 TO SHD-QUANT
+      *    MOVE SPACES TO SHD-SHIP
+           MOVE 0 TO SHD-FEE
+           MOVE 0 TO SHD-COST
+      
+      * Loop through the recorded number of records
+           PERFORM UNTIL CART-INDEX EQUAL WS-CART-COUNT
+             MOVE SCL-MEMBER(CART-INDEX)   TO SHD-MEMBER
+             MOVE SCL-CODE(CART-INDEX)     TO SHD-CODE
+             MOVE SCL-PRODUCT(CART-INDEX)  TO SHD-PRODUCT
+             MOVE SCL-PRICE(CART-INDEX)    TO SHD-PRICE
+             MOVE SCL-QUANT(CART-INDEX)    TO SHD-QUANT
+             MOVE SCL-SHIP(CART-INDEX)     TO SHD-SHIP
+             MOVE SCL-FEE(CART-INDEX)      TO SHD-FEE
+             MOVE SCL-COST(CART-INDEX)     TO SHD-COST
+      
+      * Display the data to the terminal
+             DISPLAY SHD-MEMBER WS-GAP
+                     SHD-CODE WS-GAP
+                     SHD-PRODUCT WS-GAP
+                     SHD-PRICE WS-GAP
+                     SHD-QUANT WS-GAP
+                     SHD-SHIP WS-GAP
+                     SHD-FEE WS-GAP
+                     SHD-COST WS-GAP
 
+      * Increment the index
+             ADD 1 to CART-INDEX
+           END-PERFORM.
 
