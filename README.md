@@ -17,3 +17,10 @@ Rewriting some of the code has been a challenge as there are some aspects that j
             END-IF
 ```
 - Variables are global and have levels
+
+## The plan for this project.
+
+1. Take the CSV file that contains the product and price lists and make the catalogue
+2. Using a second CSV file that contains the order information, generate the shopping cart
+3. Display the shopping cart after processing the order with the appropriate calculations
+4. Display the summary shipping manifest
