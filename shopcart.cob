@@ -42,6 +42,9 @@
       * Column count for table view of catalogue   
        01 WS-COLS          PIC 9(1) VALUE 0.
        01 WS-COLS-INDEX    PIC 9(1) VALUE 0.
+      * Variable for the total of the shopping cart
+       01 WS-CART-TOTAL    PIC 9(5)v99 VALUE 0.
+       01 WS-CART-TOTFT    PIC Z(5).99.
       * Variable for responses for console input
        01 WS-RESP          PIC X(5).
       * Temporary variables
@@ -130,6 +133,10 @@
       *    END-PERFORM
            
            PERFORM DISPLAY-SHOPPING-CART
+           PERFORM CALC-SHOP-CART-TOTAL
+           MOVE WS-CART-TOTAL TO WS-CART-TOTFT
+           DISPLAY " "
+           DISPLAY "TOTAL: $" WS-CART-TOTFT
 
            STOP RUN.
 
@@ -606,3 +613,19 @@
            END-PERFORM.
 
       **************************************************************************
+      *
+      *    Calculate the total cost of the cart at the end of the transaction
+      *
+      **************************************************************************
+       CALC-SHOP-CART-TOTAL.
+           MOVE 1 TO CART-INDEX
+           MOVE 0 TO WS-CART-TOTAL
+
+           PERFORM UNTIL CART-INDEX EQUAL WS-CART-COUNT
+      *      MOVE SCL-COST(CART-INDEX) TO WS-COST
+             COMPUTE WS-CART-TOTAL = WS-CART-TOTAL + 
+                     SCL-COST(CART-INDEX)
+      *      DISPLAY SCL-COST(CART-INDEX)
+             ADD 1 TO CART-INDEX
+           END-PERFORM
+           .
