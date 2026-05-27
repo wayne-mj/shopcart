@@ -6,6 +6,7 @@ PROJ=shopcart
 MUCK=muck
 SRC=$(PROJ).cob 
 MUCKSRC=$(MUCK).cob
+CLEANUP=muck shopcart product.dat
 
 # Build everything LOUDLY
 all: clean $(PROJ)
@@ -24,9 +25,11 @@ $(PROJ): $(SRC)
 
 # Practice code to test ideas
 $(MUCK): $(MUCKSRC)
+# 	rm $(MUCK)
 	$(COBC) $(COBCFLAGS) $(MUCKSRC)
 
 # Remove the executable
 clean:
-	echo "Removing $(PROJ)"
-	rm -rf $(PROJ)
+	echo "Removing $(CLEANUP)"
+	rm -rf $(CLEANUP)
+	
