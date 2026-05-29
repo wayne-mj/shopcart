@@ -73,6 +73,8 @@
            05 WS-MEMBER-RESP    PIC X(3) VALUE SPACE.
            05 WS-PRODUCT-RESP   PIC X(2).
            05 WS-PRODUCT-NUM    PIC 9(2).
+           05 WS-QUANT-RESP     PIC X(2).
+           05 WS-QUANT-NUM      PIC 9(2).
            
       *    *************************************************************
       *
@@ -185,8 +187,7 @@
              END-IF
 
              ADD 1 TO HWC-INDEX
-           END-PERFORM
-           .
+           END-PERFORM.
 
       *    *************************************************************
       *
@@ -228,8 +229,7 @@
              END-IF
              ADD 1 TO WS-COLS
            END-PERFORM
-           MOVE 0 TO WS-COLS
-           .
+           MOVE 0 TO WS-COLS.
 
       *    *************************************************************
       *
@@ -247,8 +247,7 @@
              ACCEPT WS-MEMBER-RESP
              PERFORM VALIDATE-MEMBER
            END-PERFORM
-           MOVE "N" TO WS-RESP-OK
-           .
+           MOVE "N" TO WS-RESP-OK.
 
        VALIDATE-MEMBER.
            EVALUATE WS-MEMBER-RESP
@@ -260,8 +259,7 @@
                MOVE 'Y' TO WS-RESP-OK
              WHEN OTHER
               DISPLAY "INVALID INPUT: 'YES/NO/END' ONLY."
-           END-EVALUATE
-       .
+           END-EVALUATE.
       
       *    *************************************************************
       *
@@ -283,8 +281,7 @@
              PERFORM VALIDATE-PRODUCT-CODE       
            END-PERFORM
            MOVE "N" TO WS-RESP-OK
-           MOVE SPACES TO WS-PRODUCT-RESP
-           .
+           MOVE SPACES TO WS-PRODUCT-RESP.
 
        VALIDATE-PRODUCT-CODE.
            EVALUATE TRUE
@@ -292,8 +289,7 @@
                MOVE "Y" TO WS-RESP-OK
              WHEN OTHER
               DISPLAY "INVALID INPUT: '1-40' ONLY."
-           END-EVALUATE
-       .
+           END-EVALUATE.
 
        SEARCH-PRODUCT-CODE.
            MOVE 1 TO HWC-INDEX
@@ -308,5 +304,36 @@
                ADD 1 TO HWC-INDEX
              END-IF
            END-PERFORM
-           MOVE 1 TO HWC-INDEX
-       .
+           MOVE 1 TO HWC-INDEX.
+
+      *    *************************************************************
+      *
+      *    Functions and methods to query to query the quantity
+      *    and to validate the response from the user
+      *
+      *    *************************************************************   
+
+       QUERY-QUANTITY.
+           MOVE 'N' TO WS-RESP-OK
+           MOVE SPACES TO WS-QUANT-RESP
+           MOVE 0 TO WS-QUANT-NUM
+
+           PERFORM UNTIL WS-RESP-OK EQUAL 'Y'
+             DISPLAY "HOW MANY ITEMS TO DISPLAY? (1-29): "
+               WITH NO ADVANCING
+               ACCEPT WS-QUANT-RESP
+               COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
+               PERFORM VALIDATE-QUANTITY
+               IF WS-RESP-OK EQUAL 'Y' THEN
+                 MOVE WS-QUANT-NUM TO SCT-QUANTITY
+               END-IF
+           END-PERFORM.
+       
+       VALIDATE-QUANTITY.
+           EVALUATE TRUE
+            WHEN WS-QUANT-NUM GREATER 0 AND LESS 30
+              MOVE 'Y' TO WS-RESP-OK
+            WHEN OTHER
+              DISPLAY "INVALID QUANTITY BETWEEN 1 AND 29 INCLUSIVELY."
+           END-EVALUATE.
+
