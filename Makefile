@@ -1,6 +1,7 @@
 COBC=cobc 
 COBCQUIET=-x -Wall
-COBCFLAGS=-x -Wall -Wextra
+COBCFLAGS=-x -Wall -fixed
+#-Wextra
 COBCJOB=-jx
 PROJ=shopcart
 MUCK=muck
