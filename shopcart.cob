@@ -63,18 +63,25 @@
        01  WS-COLS     PIC 9.
        01  WS-MAX      PIC 9(4) VALUE 1000.
 
+       01  WS-DELIVERY-METHODS.
+           05 WS-DEL   PIC X(8) VALUE "DELIVERY".
+           05 WS-PU    PIC X(7) VALUE "PICK-UP".
+
       *    *************************************************************
       *    
       *    Required variables
       *
       *    *************************************************************
-       01   WS-REQUIRED-VARIABLES.
-           05 WS-RESP-OK        PIC X(1) VALUE 'N'.
-           05 WS-MEMBER-RESP    PIC X(3) VALUE SPACE.
-           05 WS-PRODUCT-RESP   PIC X(2).
-           05 WS-PRODUCT-NUM    PIC 9(2).
-           05 WS-QUANT-RESP     PIC X(2).
-           05 WS-QUANT-NUM      PIC 9(2).
+       01  WS-REQUIRED-VARIABLES.
+           05 WS-RESP-OK        PIC X(1)    VALUE 'N'.
+           05 WS-MEMBER-RESP    PIC X(3)    VALUE SPACES.
+           05 WS-PRODUCT-RESP   PIC X(2)    VALUE SPACES.
+           05 WS-PRODUCT-NUM    PIC 9(2)    VALUE 0.
+           05 WS-QUANT-RESP     PIC X(2)    VALUE SPACES.
+           05 WS-QUANT-NUM      PIC 9(2)    VALUE 0.
+           05 WS-DELIVERY       PIC X(15)   VALUE SPACES.
+           05 WS-SHIP-FEE       PIC 9(5)V99 VALUE 0.
+           05 WS-COST           PIC 9(5)V99 VALUE 0.
            
       *    *************************************************************
       *
@@ -84,6 +91,7 @@
        01  HOMEWARECITY-STORAGE.
            05 HWC-INDEX  PIC 9(10).
            05 HWC-CODE   PIC 9(2).
+           05 SCT-INDEX  PIC 9(10).
       *    *************************************************************
       *
       *    Data structures for the tables
@@ -120,7 +128,7 @@
       *    *************************************************************
        PROCEDURE DIVISION.
            PERFORM BUILD-CATALOGUE-TABLE
-
+           
       *    PERFORM UNTIL WS-MEMBER-RESP EQUAL "END"
       *      PERFORM QUERY-IS-MEMBER
       *    END-PERFORM
@@ -311,7 +319,7 @@
       *    Functions and methods to query to query the quantity
       *    and to validate the response from the user
       *
-      *    *************************************************************   
+      *    *************************************************************
 
        QUERY-QUANTITY.
            MOVE 'N' TO WS-RESP-OK
@@ -324,9 +332,9 @@
                ACCEPT WS-QUANT-RESP
                COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
                PERFORM VALIDATE-QUANTITY
-               IF WS-RESP-OK EQUAL 'Y' THEN
-                 MOVE WS-QUANT-NUM TO SCT-QUANTITY
-               END-IF
+      *        IF WS-RESP-OK EQUAL 'Y' THEN
+      *          MOVE WS-QUANT-NUM TO SCT-QUANTITY
+      *        END-IF
            END-PERFORM.
        
        VALIDATE-QUANTITY.
@@ -335,5 +343,40 @@
               MOVE 'Y' TO WS-RESP-OK
             WHEN OTHER
               DISPLAY "INVALID QUANTITY BETWEEN 1 AND 29 INCLUSIVELY."
+           END-EVALUATE.
+
+      *    *************************************************************
+      *
+      *    Functions and methods to query to query the delivery method
+      *    and to validate the response from the user
+      *
+      *    *************************************************************
+
+       QUERY-DELIVERY-METHOD.
+           MOVE "N" TO WS-RESP-OK
+           MOVE SPACES TO WS-DELIVERY
+
+           PERFORM UNTIL WS-RESP-OK EQUAL "Y"
+             DISPLAY "DELIVERY METHOD? (DELIVERY/PICK-UP): "
+               WITH NO ADVANCING
+             ACCEPT WS-DELIVERY
+             PERFORM VALIDATE-DELIVERY-METHOD
+      *      IF WS-RESP-OK EQUAL "Y"
+      *        MOVE WS-DELIVERY TO SCT-METHOD
+      *      END-IF
+           END-PERFORM
+           MOVE "N" TO WS-RESP-OK.
+       
+       VALIDATE-DELIVERY-METHOD.
+           EVALUATE WS-DELIVERY
+      *      WHEN "DELIVERY"
+             WHEN WS-DEL
+               MOVE "Y" TO WS-RESP-OK
+      *      WHEN "PICK-UP"
+             WHEN WS-PU
+               MOVE "Y" TO WS-RESP-OK
+             WHEN OTHER
+              DISPLAY "INVALID DELIVERY METHOD. " 
+                      "CHOOSE 'DELIVERY' OR 'PICK-UP'."
            END-EVALUATE.
 
