@@ -77,9 +77,13 @@
            05 WS-MEMBER-RESP    PIC X(3)    VALUE SPACES.
            05 WS-PRODUCT-RESP   PIC X(2)    VALUE SPACES.
            05 WS-PRODUCT-NUM    PIC 9(2)    VALUE 0.
+           05 WS-PRODUCT-CODE   PIC 9(4)    VALUE 0.
+           05 WS-PRODUCT-DESC   PIC X(35)   VALUE SPACES.
+           05 WS-PRODUCT-PRICE  PIC 9(5)V99 VALUE 0.
            05 WS-QUANT-RESP     PIC X(2)    VALUE SPACES.
            05 WS-QUANT-NUM      PIC 9(2)    VALUE 0.
            05 WS-DELIVERY       PIC X(15)   VALUE SPACES.
+           05 WS-DELIVERY-NUM   PIC 9       VALUE 0.
            05 WS-SHIP-FEE       PIC 9(5)V99 VALUE 0.
            05 WS-COST           PIC 9(5)V99 VALUE 0.
            
@@ -92,6 +96,7 @@
            05 HWC-INDEX  PIC 9(10).
            05 HWC-CODE   PIC 9(2).
            05 SCT-INDEX  PIC 9(10).
+           05 SCT-COUNT  PIC 9(10).
       *    *************************************************************
       *
       *    Data structures for the tables
@@ -112,7 +117,7 @@
              10 PCH-PROD    PIC X(35)   VALUE "PRODUCT NAME".
              10 PCH-PRICE   PIC X(8)    VALUE "$  PRICE".
            
-           05 SHOPPING-CART-TABLE.
+           05 SHOPPING-CART-TABLE OCCURS 1000 TIMES.
              10 SCT-MEMBER    PIC X(3).
              10 SCT-CODE      PIC 9(4).
              10 SCT-PRODUCT   PIC X(35).
@@ -121,20 +126,118 @@
              10 SCT-METHOD    PIC X(15).
              10 SCT-FEE       PIC 9(5)V99.
              10 SCT-COST      PIC 9(5)V99.
+           
+           05 SHOPPING-CART-DISPLAY.
+             10 SDC-MEMBER    PIC X(3).
+             10 SCD-CODE      PIC Z(4).
+             10 SCD-PRODUCT   PIC X(35).
+             10 SCD-PRICE     PIC Z(5).99.
+             10 SCD-QUANTITY  PIC Z(2).
+             10 SCD-METHOD    PIC X(15).
+             10 SCD-FEE       PIC Z(5).99.
+             10 SCD-COST      PIC Z(5).99.
+      
       *    *************************************************************
       *
       *    Main body of code
       *
       *    *************************************************************
+       
        PROCEDURE DIVISION.
-           PERFORM BUILD-CATALOGUE-TABLE
-           
+           PERFORM QUERY-USER-VERSION
+      *    PERFORM BUILD-CATALOGUE-TABLE
+      *    
       *    PERFORM UNTIL WS-MEMBER-RESP EQUAL "END"
       *      PERFORM QUERY-IS-MEMBER
+      *      IF WS-MEMBER-RESP NOT EQUAL "END"
+      *        DISPLAY WS-MEMBER-RESP
+      *      END-IF
       *    END-PERFORM
 
            STOP RUN.
+       
+      *    *************************************************************
+      *
+      *    User interactive version of the code
+      *
+      *    *************************************************************
       
+       QUERY-USER-VERSION.
+           PERFORM BUILD-CATALOGUE-TABLE
+           MOVE 1 TO SCT-INDEX
+
+           PERFORM UNTIL WS-MEMBER-RESP EQUAL "END"
+             PERFORM QUERY-IS-MEMBER
+             IF WS-MEMBER-RESP NOT EQUAL "END"
+               PERFORM DISPLAY-CATALOGUE
+               PERFORM QUERY-PRODUCT-CODE
+               PERFORM SEARCH-PRODUCT-CODE
+               PERFORM QUERY-QUANTITY
+               PERFORM QUERY-DELIVERY-METHOD
+               PERFORM CALCULATE-SHIP-FEE
+               PERFORM CALCULATE-COST
+
+               PERFORM CONSOLIDATE-DATA-TO-TABLE
+      *        DISPLAY WS-MEMBER-RESP WS-GAP
+      *                WS-PRODUCT-CODE WS-GAP
+      *                WS-PRODUCT-DESC WS-GAP
+      *                WS-PRODUCT-PRICE WS-GAP
+      *                WS-QUANT-NUM WS-GAP
+      *                WS-DELIVERY WS-GAP
+      *                WS-SHIP-FEE WS-GAP
+      *                WS-COST WS-GAP
+             END-IF
+           END-PERFORM.
+           
+           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE.
+
+      *    *************************************************************
+      *
+      *    Consolidate the data into the data
+      *    Increment the index
+      *    Check how many records have been recorded so far and notify
+      *    the user if closing in on the WS-MAX.
+      *
+      *    *************************************************************
+
+       CONSOLIDATE-DATA-TO-TABLE.
+           MOVE WS-MEMBER-RESP TO SCT-MEMBER(SCT-INDEX)
+           MOVE WS-PRODUCT-CODE TO SCT-CODE(SCT-INDEX)
+           MOVE WS-PRODUCT-DESC TO SCT-PRODUCT(SCT-INDEX)
+           MOVE WS-PRODUCT-PRICE TO SCT-PRICE(SCT-INDEX)
+           MOVE WS-QUANT-NUM TO SCT-QUANTITY(SCT-INDEX)
+           MOVE WS-DELIVERY TO SCT-METHOD(SCT-INDEX)
+           MOVE WS-SHIP-FEE TO SCT-FEE(SCT-INDEX)
+           MOVE WS-COST TO SCT-COST(SCT-INDEX)
+
+           ADD 1 TO SCT-INDEX
+           MOVE SCT-INDEX TO SCT-COUNT
+           IF SCT-INDEX EQUAL 900 THEN
+             DISPLAY "WARNING: " SCT-INDEX " RECORDS OF " WS-MAX
+           END-IF
+       .
+      
+      *    *************************************************************
+      *
+      *    Display the consolidated data
+      *
+      *    *************************************************************
+
+       DISPLAY-CONSOLIDATED-DATA-TABLE.
+           MOVE 1 TO SCT-INDEX
+
+           PERFORM UNTIL SCT-INDEX EQUAL SCT-COUNT
+             DISPLAY SCT-MEMBER(SCT-INDEX) WS-GAP
+                     SCT-CODE(SCT-INDEX) WS-GAP
+                     SCT-PRODUCT(SCT-INDEX) WS-GAP
+                     SCT-PRICE(SCT-INDEX) WS-GAP
+                     SCT-QUANTITY(SCT-INDEX) WS-GAP
+                     SCT-METHOD(SCT-INDEX) WS-GAP
+                     SCT-FEE(SCT-INDEX) WS-GAP
+                     SCT-COST(SCT-INDEX)
+             ADD 1 TO SCT-INDEX
+           END-PERFORM.
+
       *    *************************************************************
       *
       *    Build the product catalogue database from the product list and
@@ -248,6 +351,7 @@
 
        QUERY-IS-MEMBER.
            MOVE SPACE TO WS-MEMBER-RESP
+           MOVE "N" TO WS-RESP-OK
            
            PERFORM UNTIL WS-RESP-OK = 'Y'
              DISPLAY "IS THE CUSTOMER A MEMBER? (YES/NO/END): "
@@ -256,6 +360,13 @@
              PERFORM VALIDATE-MEMBER
            END-PERFORM
            MOVE "N" TO WS-RESP-OK.
+      
+      *    *************************************************************
+      *
+      *    Validate that the entered response is correct and notify the
+      *    user with a response if it is not
+      *
+      *    *************************************************************
 
        VALIDATE-MEMBER.
            EVALUATE WS-MEMBER-RESP
@@ -285,11 +396,18 @@
              DISPLAY "SELECT A PRODUCT (1-40): "
                WITH NO ADVANCING
              ACCEPT WS-PRODUCT-RESP
-             COMPUTE WS-PRODUCT-NUM = FUNCTION NUMVAL (WS-MEMBER-RESP)
+             COMPUTE WS-PRODUCT-NUM = FUNCTION NUMVAL (WS-PRODUCT-RESP)
              PERFORM VALIDATE-PRODUCT-CODE       
            END-PERFORM
            MOVE "N" TO WS-RESP-OK
            MOVE SPACES TO WS-PRODUCT-RESP.
+
+      *    *************************************************************
+      *
+      *    Validate the product code entered is within the predefined
+      *    range, otherwise notify the user with an appropriate message
+      *
+      *    *************************************************************
 
        VALIDATE-PRODUCT-CODE.
            EVALUATE TRUE
@@ -299,14 +417,23 @@
               DISPLAY "INVALID INPUT: '1-40' ONLY."
            END-EVALUATE.
 
+      *    *************************************************************
+      *
+      *    Execute the search of the table for the desired product.
+      *    COBOL has a dedicated SEARCH function, but as the table is 
+      *    not using an actual INDEX which would require the use of SET
+      *    rather than MOVE/ADD PERFORM loops are used instead.
+      *
+      *    *************************************************************
+
        SEARCH-PRODUCT-CODE.
            MOVE 1 TO HWC-INDEX
            
            PERFORM UNTIL HWC-INDEX GREATER 40
              IF PCT-CODE(HWC-INDEX) EQUAL WS-PRODUCT-NUM THEN
-               MOVE PCT-CODE(HWC-INDEX) TO SCT-CODE
-               MOVE PCT-PRODUCT(HWC-INDEX) TO SCT-PRODUCT
-               MOVE PCT-PRICE(HWC-INDEX) TO SCT-PRICE
+               MOVE PCT-CODE(HWC-INDEX) TO WS-PRODUCT-CODE
+               MOVE PCT-PRODUCT(HWC-INDEX) TO WS-PRODUCT-DESC
+               MOVE PCT-PRICE(HWC-INDEX) TO WS-PRODUCT-PRICE
                EXIT PERFORM
              ELSE
                ADD 1 TO HWC-INDEX
@@ -336,7 +463,14 @@
       *          MOVE WS-QUANT-NUM TO SCT-QUANTITY
       *        END-IF
            END-PERFORM.
-       
+      
+      *    *************************************************************
+      *
+      *    Validate that the quantity entered is within the predefined
+      *    range, and if it is not notify the user
+      *
+      *    *************************************************************
+
        VALIDATE-QUANTITY.
            EVALUATE TRUE
             WHEN WS-QUANT-NUM GREATER 0 AND LESS 30
@@ -361,22 +495,68 @@
                WITH NO ADVANCING
              ACCEPT WS-DELIVERY
              PERFORM VALIDATE-DELIVERY-METHOD
+             PERFORM PROCESS-DELIVERY-METHOD
       *      IF WS-RESP-OK EQUAL "Y"
       *        MOVE WS-DELIVERY TO SCT-METHOD
       *      END-IF
            END-PERFORM
            MOVE "N" TO WS-RESP-OK.
        
+      *    *************************************************************
+      *
+      *    Validate the delivery methods that the user has entered,
+      *    if they have entered in an invalid choice, notify them
+      *
+      *    *************************************************************
+
        VALIDATE-DELIVERY-METHOD.
            EVALUATE WS-DELIVERY
       *      WHEN "DELIVERY"
              WHEN WS-DEL
                MOVE "Y" TO WS-RESP-OK
+               MOVE 1 TO WS-DELIVERY-NUM
       *      WHEN "PICK-UP"
              WHEN WS-PU
                MOVE "Y" TO WS-RESP-OK
+               MOVE 2 TO WS-DELIVERY-NUM
              WHEN OTHER
               DISPLAY "INVALID DELIVERY METHOD. " 
                       "CHOOSE 'DELIVERY' OR 'PICK-UP'."
            END-EVALUATE.
+
+       PROCESS-DELIVERY-METHOD.
+           MOVE 0 TO WS-DELIVERY-NUM
+           IF WS-DELIVERY EQUAL WS-DEL THEN
+             MOVE 1 TO WS-DELIVERY-NUM
+           IF WS-DELIVERY EQUAL WS-PU THEN
+             MOVE 2 TO WS-DELIVERY-NUM
+           END-IF.
+
+      *    *************************************************************
+      *
+      *    Functions and methods to calculate shipping and costs
+      *
+      *    *************************************************************
+
+       CALCULATE-SHIP-FEE.
+           MOVE 0 TO WS-SHIP-FEE
+           
+           IF WS-DELIVERY-NUM EQUAL 1 THEN
+             IF WS-QUANT-NUM GREATER THAN 1 THEN
+               COMPUTE WS-SHIP-FEE = 2.00 + 
+                       (( WS-QUANT-NUM - 1 ) * 1.60)
+             ELSE
+               MOVE 2.00 TO WS-SHIP-FEE
+             END-IF
+           END-IF.
+
+       CALCULATE-COST.
+           MOVE 0 TO WS-COST
+
+           COMPUTE WS-COST = (WS-QUANT-NUM * WS-PRODUCT-PRICE) + 
+                              WS-SHIP-FEE
+
+           IF WS-MEMBER-RESP EQUAL "YES" THEN
+             COMPUTE WS-COST = WS-COST * (90 / 100)
+           END-IF.
 
