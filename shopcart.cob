@@ -97,6 +97,8 @@
            05 HWC-CODE   PIC 9(2).
            05 SCT-INDEX  PIC 9(10).
            05 SCT-COUNT  PIC 9(10).
+      *    05 SCT-IDX    PIC 9(4).
+           05 SCT-IDXC   PIC 9(4).
       *    *************************************************************
       *
       *    Data structures for the tables
@@ -126,6 +128,18 @@
              10 SCT-METHOD    PIC X(15).
              10 SCT-FEE       PIC 9(5)V99.
              10 SCT-COST      PIC 9(5)V99.
+           
+           05 SHOPPING-CART-TABLE-INDEXED OCCURS 1000 TIMES
+               ASCENDING KEY IS SCTI-CODE
+               INDEXED BY SCT-IDX.
+             10 SCTI-MEMBER    PIC X(3).
+             10 SCTI-CODE      PIC 9(4).
+             10 SCTI-PRODUCT   PIC X(35).
+             10 SCTI-PRICE     PIC 9(5)V9(2).
+             10 SCTI-QUANTITY  PIC 9(2).
+             10 SCTI-METHOD    PIC X(15).
+             10 SCTI-FEE       PIC 9(5)V99.
+             10 SCTI-COST      PIC 9(5)V99.
            
            05 SHOPPING-CART-DISPLAY.
              10 SDC-MEMBER    PIC X(3).
@@ -165,6 +179,7 @@
        QUERY-USER-VERSION.
            PERFORM BUILD-CATALOGUE-TABLE
            MOVE 1 TO SCT-INDEX
+           SET SCT-IDX TO 1
 
            PERFORM UNTIL WS-MEMBER-RESP EQUAL "END"
              PERFORM QUERY-IS-MEMBER
@@ -177,7 +192,7 @@
                PERFORM CALCULATE-SHIP-FEE
                PERFORM CALCULATE-COST
 
-               PERFORM CONSOLIDATE-DATA-TO-TABLE
+               PERFORM CONSOLIDATE-DATA-TO-TABLE-INDEXED
       *        DISPLAY WS-MEMBER-RESP WS-GAP
       *                WS-PRODUCT-CODE WS-GAP
       *                WS-PRODUCT-DESC WS-GAP
@@ -189,7 +204,12 @@
              END-IF
            END-PERFORM.
            
-           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE.
+           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
+           DISPLAY " ... "
+           PERFORM SORT-TABLE
+           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+      *    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE.
+           .
 
       *    *************************************************************
       *
@@ -216,6 +236,24 @@
              DISPLAY "WARNING: " SCT-INDEX " RECORDS OF " WS-MAX
            END-IF
        .
+
+       CONSOLIDATE-DATA-TO-TABLE-INDEXED.
+           MOVE WS-MEMBER-RESP TO SCTI-MEMBER(SCT-IDX)
+           MOVE WS-PRODUCT-CODE TO SCTI-CODE(SCT-IDX) 
+           MOVE WS-PRODUCT-DESC TO SCTI-PRODUCT(SCT-IDX)
+           MOVE WS-PRODUCT-PRICE TO SCTI-PRICE(SCT-IDX)
+           MOVE WS-QUANT-NUM TO SCTI-QUANTITY(SCT-IDX)
+           MOVE WS-DELIVERY TO SCTI-METHOD(SCT-IDX)
+           MOVE WS-SHIP-FEE TO SCTI-FEE(SCT-IDX)
+           MOVE WS-COST TO SCTI-COST(SCT-IDX)
+           
+           SET SCT-IDX UP BY 1
+           MOVE SCT-IDX TO SCT-IDXC
+
+           IF SCT-IDXC EQUAL 900 THEN
+             DISPLAY "WARNING: " SCT-IDXC " RECORDS OF " WS-MAX
+           END-IF
+       .
       
       *    *************************************************************
       *
@@ -236,6 +274,19 @@
                      SCT-FEE(SCT-INDEX) WS-GAP
                      SCT-COST(SCT-INDEX)
              ADD 1 TO SCT-INDEX
+           END-PERFORM.
+       
+       DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
+           PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX 
+                   EQUAL SCT-IDXC
+           DISPLAY SCTI-MEMBER(SCT-IDX) WS-GAP
+                   SCTI-CODE(SCT-IDX) WS-GAP
+                   SCTI-PRODUCT(SCT-IDX) WS-GAP
+                   SCTI-PRICE(SCT-IDX) WS-GAP
+                   SCTI-QUANTITY(SCT-IDX) WS-GAP
+                   SCTI-METHOD(SCT-IDX) WS-GAP
+                   SCTI-FEE(SCT-IDX) WS-GAP
+                   SCTI-COST(SCT-IDX)
            END-PERFORM.
 
       *    *************************************************************
@@ -560,3 +611,8 @@
              COMPUTE WS-COST = WS-COST * (90 / 100)
            END-IF.
 
+       SORT-TABLE.
+           SORT SHOPPING-CART-TABLE-INDEXED ON ASCENDING KEY SCTI-CODE
+       .
+
+       
