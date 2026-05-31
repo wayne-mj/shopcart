@@ -62,6 +62,8 @@
       *01  WS-GAP      PIC X(4) VALUE "....".
        01  WS-COLS     PIC 9.
        01  WS-MAX      PIC 9(4) VALUE 1000.
+       01  I           PIC 9(4) VALUE 0.
+       01  J           PIC 9(4) VALUE 0.
 
        01  WS-DELIVERY-METHODS.
            05 WS-DEL   PIC X(8) VALUE "DELIVERY".
@@ -86,6 +88,7 @@
            05 WS-DELIVERY-NUM   PIC 9       VALUE 0.
            05 WS-SHIP-FEE       PIC 9(5)V99 VALUE 0.
            05 WS-COST           PIC 9(5)V99 VALUE 0.
+           
            
       *    *************************************************************
       *
@@ -140,6 +143,16 @@
              10 SCTI-METHOD    PIC X(15).
              10 SCTI-FEE       PIC 9(5)V99.
              10 SCTI-COST      PIC 9(5)V99.
+           
+           05 TEMP-CART.
+             10 FILLER    PIC X(3).
+             10 FILLER    PIC 9(4).
+             10 FILLER    PIC X(35).
+             10 FILLER    PIC 9(5)V9(2).
+             10 FILLER    PIC 9(2).
+             10 FILLER    PIC X(15).
+             10 FILLER    PIC 9(5)V99.
+             10 FILLER    PIC 9(5)V99.  
            
            05 SHOPPING-CART-DISPLAY.
              10 SDC-MEMBER    PIC X(3).
@@ -611,8 +624,47 @@
              COMPUTE WS-COST = WS-COST * (90 / 100)
            END-IF.
 
+      *    *************************************************************
+      *
+      *    Functions and methods to perform Bubble sort
+      *
+      *    *************************************************************
+
        SORT-TABLE.
-           SORT SHOPPING-CART-TABLE-INDEXED ON ASCENDING KEY SCTI-CODE
+      *    PERFORM VARYING I FROM 1 BY 1 UNTIL I > SCT-IDXC - 1
+           PERFORM VARYING I FROM 1 BY 1 UNTIL I EQUAL SCT-IDXC
+      *      PERFORM VARYING J FROM I BY 1 UNTIL J > SCT-IDXC - 1
+             PERFORM VARYING J FROM I BY 1 UNTIL J EQUAL SCT-IDXC
+               IF SCTI-CODE(I) > SCTI-CODE(J)
+                 PERFORM SWAP-RECORD
+               END-IF
+             END-PERFORM
+           END-PERFORM
        .
+
+       SWAP-RECORD.
+           MOVE SHOPPING-CART-TABLE-INDEXED(I) TO TEMP-CART
+           MOVE SHOPPING-CART-TABLE-INDEXED(J) TO
+                SHOPPING-CART-TABLE-INDEXED(I)
+           MOVE TEMP-CART TO SHOPPING-CART-TABLE-INDEXED(J)
+       .
+
+       COPILOT-SORT-TABLE.
+           PERFORM VARYING I FROM 1 BY 1 UNTIL I >= SCT-IDXC - 1
+             PERFORM VARYING J FROM 1 BY 1 UNTIL J >= SCT-IDXC - I
+               IF SCTI-CODE(J) > SCTI-CODE(J + 1)
+                 PERFORM COPILOT-SWAP-RECORD
+               END-IF
+             END-PERFORM
+           END-PERFORM
+       .
+
+       COPILOT-SWAP-RECORD.
+           MOVE SHOPPING-CART-TABLE-INDEXED(J) TO TEMP-CART
+           MOVE SHOPPING-CART-TABLE-INDEXED(J + 1) TO
+                SHOPPING-CART-TABLE-INDEXED(J)
+           MOVE TEMP-CART TO SHOPPING-CART-TABLE-INDEXED(J + 1)
+       .
+       
 
        
