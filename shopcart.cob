@@ -25,6 +25,7 @@
       *    Variables and other related items for files
       *
       *    *************************************************************
+
        FILE SECTION.
       * File descriptor for CSV file
        FD  CSV-PRODUCT-FILE.
@@ -58,13 +59,19 @@
       *
       *    *************************************************************
            
+      *    Gap between headers and columns
        01  WS-GAP      PIC X(4) VALUE SPACES.
+      *    Debug gap to check if the gap is looking right
       *01  WS-GAP      PIC X(4) VALUE "....".
+      *    Variable to track the columns
        01  WS-COLS     PIC 9.
+      *    Max table depth
        01  WS-MAX      PIC 9(4) VALUE 9999.
+      *    Variables for Bubble sort
        01  I           PIC 9(4) VALUE 0.
        01  J           PIC 9(4) VALUE 0.
 
+      *    So I do not have to type over and over and over again
        01  WS-DELIVERY-METHODS.
            05 WS-DEL   PIC X(8) VALUE "DELIVERY".
            05 WS-PU    PIC X(7) VALUE "PICK-UP".
@@ -75,27 +82,50 @@
       *
       *    *************************************************************
        01  WS-REQUIRED-VARIABLES.
+      *    Used to track what line errors occurred in the source cart
            05 WS-CART-LINE      PIC 9(7)    VALUE 0.
+      *    Boolean variable to track if to display an error message
            05 WS-DISP-ERR       PIC X(1)    VALUE "N".
+      *    Buffer for the error message
            05 WS-DISP-MSG       PIC X(15)   VALUE SPACES.
+      *    Boolean variable to determine if the response is OK or not
            05 WS-RESP-OK        PIC X(1)    VALUE 'N'.
+      *    Boolean to determine if silent operation
            05 WS-SILENT         PIC X(1)    VALUE 'N'.
+      *    Member YES/NO/END
            05 WS-MEMBER-RESP    PIC X(3)    VALUE SPACES.
+      *    Product Code as string
            05 WS-PRODUCT-RESP   PIC X(2)    VALUE SPACES.
+      *    Product code as number
            05 WS-PRODUCT-NUM    PIC 9(2)    VALUE 0.
+      *    Formatted product code
            05 WS-PRODUCT-CODE   PIC 9(4)    VALUE 0.
+      *    Product description
            05 WS-PRODUCT-DESC   PIC X(35)   VALUE SPACES.
+      *    Formatted product price
            05 WS-PRODUCT-PRICE  PIC 9(5)V99 VALUE 0.
+      *    Quantity as string
            05 WS-QUANT-RESP     PIC X(2)    VALUE SPACES.
+      *    Quantity as number
            05 WS-QUANT-NUM      PIC 9(2)    VALUE 0.
+      *    DELIVERY/PICK-UP
            05 WS-DELIVERY       PIC X(15)   VALUE SPACES.
+      *    Numerical indicator for DELIVERY/PICK-UP 1 OR 2
            05 WS-DELIVERY-NUM   PIC 9       VALUE 0.
+      *    Calculated shipping fee formatted
            05 WS-SHIP-FEE       PIC 9(5)V99 VALUE 0.
+      *    Calculated cost formatted
            05 WS-COST           PIC 9(5)V99 VALUE 0.
+      *    Calculated total cost formatted
            05 WS-TOTAL-COST     PIC 9(5)V99 VALUE 0.
+      *    Used for the report generation to indicate if a record has 
+      *    been found
            05 WS-FOUND          PIC X(1)    VALUE 'N'.
+      *    Calculated quantity
            05 WS-REPORT-Q       PIC 9(4).
+      *    Calculated cost
            05 WS-REPORT-C       PIC 9(5)V99.
+      *    Total errors detected
            05 WS-ERRORS         PIC 9(4)    VALUE 0.
 
       *    *************************************************************
@@ -104,27 +134,44 @@
       *
       *    *************************************************************
        01  HOMEWARECITY-STORAGE.
+      *    Manual indexing of the product table
            05 HWC-INDEX  PIC 9(10).
+      *    Manual calculation of the product code
            05 HWC-CODE   PIC 9(2).
+      *    Shopping cart table index manual method
            05 SCT-INDEX  PIC 9(10).
+      *    Count of the table for the shopping cart
            05 SCT-COUNT  PIC 9(10).
+      *    Index counter for Shopping Cart Table
            05 SCT-IDXC   PIC 9(4).
+      *    Index counter for Shopping Cart Report
            05 SCR-IDXC   PIC 9(4).
+
       *    *************************************************************
       *
       *    Data structures for the tables
       *
       *    *************************************************************
+
+      *    *************************************************************
+      *
+      *    Product Catalogue Table Data structures
+      *
+      *    *************************************************************
+
+      *    Structure for Product catalogue table
            05 PRODUCT-CATALOGUE-TABLE OCCURS 40 TIMES.
              10 PCT-CODE            PIC 9(4).
              10 PCT-PRODUCT         PIC X(35).
              10 PCT-PRICE           PIC 9(5)V99.
            
+      *    Structure for displaying the data structure
            05 PRODUCT-CATALOGUE-DISPLAY.
              10 PCD-CODE            PIC Z(4).
              10 PCD-PRODUCT         PIC X(35).
              10 PCD-PRICE           PIC Z(5).99.
            
+      *    Structure for the headers
            05 PRODUCT-CATALOGUE-HEADERS.
              10 PCH-CODE    PIC X(4)    VALUE "CODE".
              10 PCH-PROD    PIC X(35)   VALUE "PRODUCT NAME".
@@ -139,17 +186,14 @@
       *      10 SCT-METHOD    PIC X(15).
       *      10 SCT-FEE       PIC 9(5)V99.
       *      10 SCT-COST      PIC 9(5)V99.
-           
-           05 SHOPTING-CART-TABLE-HEADERS.
-             10 SCTH-MEMBER    PIC X(10)    VALUE "MEMBER".
-             10 SCTH-CODE      PIC X(4)     VALUE "CODE".
-             10 SCTH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
-             10 SCTH-PRICE     PIC X(8)     VALUE "$  PRICE".
-             10 SCTH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
-             10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
-             10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
-             10 SCTH-COST      PIC X(8)     VALUE "$   COST".
 
+      *    *************************************************************
+      *
+      *    Shopping Cart Table Data structures
+      *
+      *    *************************************************************
+           
+      *    Structure of table shopping cart
            05 SHOPPING-CART-TABLE-INDEXED OCCURS 9999 TIMES
                ASCENDING KEY IS SCTI-CODE
                INDEXED BY SCT-IDX.
@@ -162,14 +206,30 @@
              10 SCTI-FEE       PIC 9(5)V99.
              10 SCTI-COST      PIC 9(5)V99.
 
-           05 SHOPPING-CART-REPORT-INDEX OCCURS 9999 TIMES
-               INDEXED BY SCR-IDX.
-             10 SCRI-CODE      PIC 9(4).
-             10 SCRI-PRODUCT   PIC X(35).
-             10 SCRI-PRICE     PIC 9(5)V99.
-             10 SCRI-QUANTITY  PIC 9(4).
-             10 SCRI-COST      PIC 9(5)V99.
+      *    Structure for headers for shopping cart
+           05 SHOPTING-CART-TABLE-HEADERS.
+             10 SCTH-MEMBER    PIC X(10)    VALUE "MEMBER".
+             10 SCTH-CODE      PIC X(4)     VALUE "CODE".
+             10 SCTH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+             10 SCTH-PRICE     PIC X(8)     VALUE "$  PRICE".
+             10 SCTH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+             10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
+             10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
+             10 SCTH-COST      PIC X(8)     VALUE "$   COST".
+
+      *    Display data structure for shopping cart
+           05 SHOPPING-CART-TABLE-DISPLAY.
+             10 SCTD-MEMBER    PIC X(10).
+             10 SCTD-CODE      PIC Z(4).
+             10 SCTD-PRODUCT   PIC X(35).
+             10 SCTD-PRICE     PIC Z(5).99.
+             10 SCTD-QUANTITY  PIC Z(8).
+             10 SCTD-METHOD    PIC X(15).
+             10 SCTD-FEE       PIC Z(9).99.
+             10 SCTD-COST      PIC Z(5).99.
+             10 SCTD-TOTAL     PIC Z(5).99.
            
+      *    Temporary data structure for Bubble sort
            05 TEMP-CART.
              10 FILLER    PIC X(3).
              10 FILLER    PIC 9(4).
@@ -179,18 +239,22 @@
              10 FILLER    PIC X(15).
              10 FILLER    PIC 9(5)V99.
              10 FILLER    PIC 9(5)V99.  
-           
-           05 SHOPPING-CART-DISPLAY.
-             10 SDC-MEMBER    PIC X(10).
-             10 SCD-CODE      PIC Z(4).
-             10 SCD-PRODUCT   PIC X(35).
-             10 SCD-PRICE     PIC Z(5).99.
-             10 SCD-QUANTITY  PIC Z(8).
-             10 SCD-METHOD    PIC X(15).
-             10 SCD-FEE       PIC Z(9).99.
-             10 SCD-COST      PIC Z(5).99.
-             10 SCD-TOTAL     PIC Z(5).99.
-      
+
+      *    *************************************************************
+      *
+      *    Shopping Cart Report Data structures
+      *
+      *    *************************************************************
+
+      *    Shopping cart report data structure
+           05 SHOPPING-CART-REPORT-INDEX OCCURS 9999 TIMES
+               INDEXED BY SCR-IDX.
+             10 SCRI-CODE      PIC 9(4).
+             10 SCRI-PRODUCT   PIC X(35).
+             10 SCRI-PRICE     PIC 9(5)V99.
+             10 SCRI-QUANTITY  PIC 9(4).
+             10 SCRI-COST      PIC 9(5)V99.
+
       *    *************************************************************
       *
       *    Main body of code
@@ -204,16 +268,6 @@
 
       *    PERFORM QUERY-USER-VERSION
            PERFORM QUERY-NON-INTERACTIVE-VERSION
-
-      *    PERFORM BUILD-CATALOGUE-TABLE
-      *    PERFORM PROCESS-SHOPPING-CART
-      *    
-      *    PERFORM SORT-TABLE
-      *    PERFORM GENERATE-SHIPPING-REPORT
-      *    PERFORM DISPLAY-SHIPPING-REPORT
-      **    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
-      *    DISPLAY " "
-      *    DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
 
            STOP RUN.
        
@@ -345,29 +399,29 @@
 
            PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX 
                    EQUAL SCT-IDXC
-             MOVE SCTI-MEMBER(SCT-IDX) TO SDC-MEMBER
-             MOVE SCTI-CODE(SCT-IDX) TO SCD-CODE
-             MOVE SCTI-PRODUCT(SCT-IDX) TO SCD-PRODUCT
-             MOVE SCTI-PRICE(SCT-IDX) TO SCD-PRICE
-             MOVE SCTI-QUANTITY(SCT-IDX) TO SCD-QUANTITY
-             MOVE SCTI-METHOD(SCT-IDX) TO SCD-METHOD
-             MOVE SCTI-FEE(SCT-IDX) TO SCD-FEE
-             MOVE SCTI-COST(SCT-IDX) TO SCD-COST
+             MOVE SCTI-MEMBER(SCT-IDX)   TO SCTD-MEMBER
+             MOVE SCTI-CODE(SCT-IDX)     TO SCTD-CODE
+             MOVE SCTI-PRODUCT(SCT-IDX)  TO SCTD-PRODUCT
+             MOVE SCTI-PRICE(SCT-IDX)    TO SCTD-PRICE
+             MOVE SCTI-QUANTITY(SCT-IDX) TO SCTD-QUANTITY
+             MOVE SCTI-METHOD(SCT-IDX)   TO SCTD-METHOD
+             MOVE SCTI-FEE(SCT-IDX)      TO SCTD-FEE
+             MOVE SCTI-COST(SCT-IDX)     TO SCTD-COST
              COMPUTE WS-TOTAL-COST = WS-TOTAL-COST + SCTI-COST(SCT-IDX)
 
-             DISPLAY SDC-MEMBER WS-GAP
-                     SCD-CODE WS-GAP
-                     SCD-PRODUCT WS-GAP
-                     SCD-PRICE WS-GAP
-                     SCD-QUANTITY WS-GAP
-                     SCD-METHOD WS-GAP
-                     SCD-FEE WS-GAP
-                     SCD-COST
+             DISPLAY SCTD-MEMBER WS-GAP
+                     SCTD-CODE WS-GAP
+                     SCTD-PRODUCT WS-GAP
+                     SCTD-PRICE WS-GAP
+                     SCTD-QUANTITY WS-GAP
+                     SCTD-METHOD WS-GAP
+                     SCTD-FEE WS-GAP
+                     SCTD-COST
            END-PERFORM
            
            DISPLAY " "
-           MOVE WS-TOTAL-COST TO SCD-TOTAL
-           DISPLAY "TOTAL: $" SCD-TOTAL
+           MOVE WS-TOTAL-COST TO SCTD-TOTAL
+           DISPLAY "TOTAL: $" SCTD-TOTAL
            .
 
        GENERATE-SHIPPING-REPORT.
