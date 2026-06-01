@@ -61,7 +61,7 @@
        01  WS-GAP      PIC X(4) VALUE SPACES.
       *01  WS-GAP      PIC X(4) VALUE "....".
        01  WS-COLS     PIC 9.
-       01  WS-MAX      PIC 9(4) VALUE 1000.
+       01  WS-MAX      PIC 9(4) VALUE 9999.
        01  I           PIC 9(4) VALUE 0.
        01  J           PIC 9(4) VALUE 0.
 
@@ -75,7 +75,11 @@
       *
       *    *************************************************************
        01  WS-REQUIRED-VARIABLES.
+           05 WS-CART-LINE      PIC 9(7)    VALUE 0.
+           05 WS-DISP-ERR       PIC X(1)    VALUE "N".
+           05 WS-DISP-MSG       PIC X(15)   VALUE SPACES.
            05 WS-RESP-OK        PIC X(1)    VALUE 'N'.
+           05 WS-SILENT         PIC X(1)    VALUE 'N'.
            05 WS-MEMBER-RESP    PIC X(3)    VALUE SPACES.
            05 WS-PRODUCT-RESP   PIC X(2)    VALUE SPACES.
            05 WS-PRODUCT-NUM    PIC 9(2)    VALUE 0.
@@ -132,7 +136,7 @@
              10 SCT-FEE       PIC 9(5)V99.
              10 SCT-COST      PIC 9(5)V99.
            
-           05 SHOPPING-CART-TABLE-INDEXED OCCURS 1000 TIMES
+           05 SHOPPING-CART-TABLE-INDEXED OCCURS 9999 TIMES
                ASCENDING KEY IS SCTI-CODE
                INDEXED BY SCT-IDX.
              10 SCTI-MEMBER    PIC X(3).
@@ -171,7 +175,16 @@
       *    *************************************************************
        
        PROCEDURE DIVISION.
-           PERFORM QUERY-USER-VERSION
+      *    PERFORM QUERY-USER-VERSION
+           PERFORM BUILD-CATALOGUE-TABLE
+           PERFORM PROCESS-SHOPPING-CART
+           DISPLAY SCT-IDXC
+           
+           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+           DISPLAY " ... "
+           PERFORM SORT-TABLE
+           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+
       *    PERFORM BUILD-CATALOGUE-TABLE
       *    
       *    PERFORM UNTIL WS-MEMBER-RESP EQUAL "END"
@@ -190,7 +203,9 @@
       *    *************************************************************
       
        QUERY-USER-VERSION.
-           PERFORM BUILD-CATALOGUE-TABLE
+      *    Commented out as this need to be done regardless of 
+      *    automation of manual input
+      *    PERFORM BUILD-CATALOGUE-TABLE
            MOVE 1 TO SCT-INDEX
            SET SCT-IDX TO 1
 
@@ -206,14 +221,6 @@
                PERFORM CALCULATE-COST
 
                PERFORM CONSOLIDATE-DATA-TO-TABLE-INDEXED
-      *        DISPLAY WS-MEMBER-RESP WS-GAP
-      *                WS-PRODUCT-CODE WS-GAP
-      *                WS-PRODUCT-DESC WS-GAP
-      *                WS-PRODUCT-PRICE WS-GAP
-      *                WS-QUANT-NUM WS-GAP
-      *                WS-DELIVERY WS-GAP
-      *                WS-SHIP-FEE WS-GAP
-      *                WS-COST WS-GAP
              END-IF
            END-PERFORM.
            
@@ -245,8 +252,9 @@
 
            ADD 1 TO SCT-INDEX
            MOVE SCT-INDEX TO SCT-COUNT
-           IF SCT-INDEX EQUAL 900 THEN
-             DISPLAY "WARNING: " SCT-INDEX " RECORDS OF " WS-MAX
+           IF SCT-INDEX EQUAL 9000 THEN
+             DISPLAY "*** WARNING: " SCT-INDEX 
+                     " RECORDS OF " WS-MAX " ***"
            END-IF
        .
 
@@ -263,8 +271,9 @@
            SET SCT-IDX UP BY 1
            MOVE SCT-IDX TO SCT-IDXC
 
-           IF SCT-IDXC EQUAL 900 THEN
-             DISPLAY "WARNING: " SCT-IDXC " RECORDS OF " WS-MAX
+           IF SCT-IDXC EQUAL 9000 THEN
+             DISPLAY "*** WARNING: " SCT-IDXC 
+                     " RECORDS OF " WS-MAX " ***"
            END-IF
        .
       
@@ -328,6 +337,73 @@
            END-PERFORM.
            CLOSE CSV-PRODUCT-FILE
            MOVE 'N' TO WS-EOF01.
+
+      *    *************************************************************
+      *
+      *    Automate shopping cart processing
+      *
+      *    ************************************************************* 
+
+       PROCESS-SHOPPING-CART.
+           MOVE "N" TO WS-EOF01
+           MOVE "Y" TO WS-SILENT
+           OPEN INPUT CSV-SHOPPING-CART-FILE.
+           PERFORM UNTIL WS-EOF01 EQUAL 'Y'
+             READ CSV-SHOPPING-CART-FILE
+               AT END MOVE 'Y' TO WS-EOF01
+               NOT AT END
+                 UNSTRING CSV-SHOPPING-CART-RECORD
+                   DELIMITED BY "," INTO
+                     WS-MEMBER-RESP
+                     WS-PRODUCT-RESP
+                     WS-QUANT-RESP
+                     WS-DELIVERY
+
+      *    All of this needs to succeed for the next part to proceed
+      *    Any part fails, then it cannot proceed as an invalid choice
+      *    has occurred and need to be addressed.
+                 ADD 1 TO WS-CART-LINE
+                 PERFORM PROCESS-IS-MEMBER
+                 IF WS-RESP-OK EQUAL "Y" THEN
+                   PERFORM PROCESS-PRODUCT-CODE
+                   MOVE 'N' TO WS-DISP-ERR
+                   IF WS-RESP-OK EQUAL "Y" THEN
+                     PERFORM PROCESS-QUANTITY
+                     MOVE 'N' TO WS-DISP-ERR
+                     IF WS-RESP-OK EQUAL "Y" THEN
+                       PERFORM PROCESS-DELIVERY
+                       MOVE 'N' TO WS-DISP-ERR
+                       IF WS-RESP-OK EQUAL "Y" THEN
+                         PERFORM CALCULATE-SHIP-FEE
+                         PERFORM CALCULATE-COST
+                         PERFORM CONSOLIDATE-DATA-TO-TABLE-INDEXED
+                         MOVE 'N' TO WS-DISP-ERR
+                       ELSE
+                         MOVE 'Y' TO WS-DISP-ERR
+                         MOVE "DELIVERY" TO WS-DISP-MSG
+                       END-IF
+                     ELSE
+                       MOVE 'Y' TO WS-DISP-ERR
+                       MOVE "QUANTITY" TO WS-DISP-MSG
+                     END-IF
+                   ELSE
+                     MOVE 'Y' TO WS-DISP-ERR
+                     MOVE "CODE" TO WS-DISP-MSG
+                   END-IF
+                 ELSE
+                   MOVE 'Y' TO WS-DISP-ERR
+                   MOVE "MEMBER" TO WS-DISP-MSG
+                 END-IF
+      *          MOVE 'Y' TO WS-RESP-OK
+                 IF WS-DISP-ERR EQUAL "Y" THEN
+                   DISPLAY "FIX ENTRY ON LINE: " WS-CART-LINE WS-GAP
+                           "ERROR: " WS-DISP-MSG
+                 END-IF
+             END-READ
+           END-PERFORM
+           CLOSE CSV-SHOPPING-CART-FILE
+           MOVE 'N' TO WS-EOF01
+       .
 
       *    *************************************************************
       *
@@ -432,6 +508,12 @@
       *
       *    *************************************************************
 
+       PROCESS-IS-MEMBER.
+           MOVE 'N' TO WS-RESP-OK
+           
+           PERFORM VALIDATE-MEMBER
+       .
+
        VALIDATE-MEMBER.
            EVALUATE WS-MEMBER-RESP
              WHEN "YES"
@@ -441,7 +523,10 @@
              WHEN "END"
                MOVE 'Y' TO WS-RESP-OK
              WHEN OTHER
-              DISPLAY "INVALID INPUT: 'YES/NO/END' ONLY."
+               MOVE 'N' TO WS-RESP-OK
+               IF WS-SILENT EQUAL "N"
+                 DISPLAY "INVALID INPUT: 'YES/NO/END' ONLY."
+               END-IF
            END-EVALUATE.
       
       *    *************************************************************
@@ -473,12 +558,25 @@
       *
       *    *************************************************************
 
+       PROCESS-PRODUCT-CODE.
+           MOVE 'N' TO WS-RESP-OK
+           
+           COMPUTE WS-PRODUCT-NUM = FUNCTION NUMVAL(WS-PRODUCT-RESP)
+           PERFORM VALIDATE-PRODUCT-CODE
+           IF WS-RESP-OK EQUAL "Y" THEN
+             PERFORM SEARCH-PRODUCT-CODE
+           END-IF
+       .
+
        VALIDATE-PRODUCT-CODE.
            EVALUATE TRUE
              WHEN WS-PRODUCT-NUM GREATER 0 AND WS-PRODUCT-NUM LESS 41
                MOVE "Y" TO WS-RESP-OK
              WHEN OTHER
-              DISPLAY "INVALID INPUT: '1-40' ONLY."
+               MOVE "N" TO WS-RESP-OK
+               IF WS-SILENT EQUAL 'N'
+                DISPLAY "INVALID INPUT: '1-40' ONLY."
+               END-IF
            END-EVALUATE.
 
       *    *************************************************************
@@ -535,12 +633,22 @@
       *
       *    *************************************************************
 
+       PROCESS-QUANTITY.
+           MOVE 'N' TO WS-RESP-OK
+           
+           COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
+           PERFORM VALIDATE-QUANTITY
+       .
+
        VALIDATE-QUANTITY.
            EVALUATE TRUE
             WHEN WS-QUANT-NUM GREATER 0 AND LESS 30
               MOVE 'Y' TO WS-RESP-OK
             WHEN OTHER
-              DISPLAY "INVALID QUANTITY BETWEEN 1 AND 29 INCLUSIVELY."
+              MOVE "N" TO WS-RESP-OK
+              IF WS-SILENT EQUAL 'N' THEN
+                DISPLAY "INVALID QUANTITY BETWEEN 1 AND 29 INCLUSIVELY."
+              END-IF
            END-EVALUATE.
 
       *    *************************************************************
@@ -573,6 +681,12 @@
       *
       *    *************************************************************
 
+       PROCESS-DELIVERY.
+           MOVE 'N' TO WS-RESP-OK
+           PERFORM VALIDATE-DELIVERY-METHOD
+           PERFORM PROCESS-DELIVERY-METHOD
+       .
+
        VALIDATE-DELIVERY-METHOD.
            EVALUATE WS-DELIVERY
       *      WHEN "DELIVERY"
@@ -584,8 +698,10 @@
                MOVE "Y" TO WS-RESP-OK
                MOVE 2 TO WS-DELIVERY-NUM
              WHEN OTHER
-              DISPLAY "INVALID DELIVERY METHOD. " 
-                      "CHOOSE 'DELIVERY' OR 'PICK-UP'."
+               IF WS-SILENT EQUAL "N" THEN
+                 DISPLAY "INVALID DELIVERY METHOD. " 
+                         "CHOOSE 'DELIVERY' OR 'PICK-UP'."
+               END-IF
            END-EVALUATE.
 
        PROCESS-DELIVERY-METHOD.
@@ -627,6 +743,7 @@
       *    *************************************************************
       *
       *    Functions and methods to perform Bubble sort
+      *    This is based loosely on the W3 School Python version
       *
       *    *************************************************************
 
@@ -648,6 +765,17 @@
                 SHOPPING-CART-TABLE-INDEXED(I)
            MOVE TEMP-CART TO SHOPPING-CART-TABLE-INDEXED(J)
        .
+
+      *    *************************************************************
+      *    
+      *    I asked Copilot for help as I was losing the first record.
+      *    I did not realise I was iterating beyond the indexed bounds
+      *    which meant that 0 was possible and this was being added to
+      *    to the table.  Copilot also suggested a fix to stop self 
+      *    referencing the first element and this is what it came up 
+      *    with.  I kept it separate from my code as it is not my work.
+      *
+      *    *************************************************************
 
        COPILOT-SORT-TABLE.
            PERFORM VARYING I FROM 1 BY 1 UNTIL I >= SCT-IDXC - 1
