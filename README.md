@@ -24,3 +24,9 @@ Rewriting some of the code has been a challenge as there are some aspects that j
 2. Using a second CSV file that contains the order information, generate the shopping cart
 3. Display the shopping cart after processing the order with the appropriate calculations
 4. Display the summary shipping manifest
+
+## What has been accomplished.
+
+- The program will read the product and price lists from the data file, and produce an in memory data structure that can be searched using a 1 indexed table that is also the basis of the product code.
+- It is capable of processing 10K of records, and identifying the error and what corrective measure is required and displays the appropriate message to the user.
+- Using Bubble sort, it can organise the records in product code order.
