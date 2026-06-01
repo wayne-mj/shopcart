@@ -92,8 +92,12 @@
            05 WS-DELIVERY-NUM   PIC 9       VALUE 0.
            05 WS-SHIP-FEE       PIC 9(5)V99 VALUE 0.
            05 WS-COST           PIC 9(5)V99 VALUE 0.
-           
-           
+           05 WS-TOTAL-COST     PIC 9(5)V99 VALUE 0.
+           05 WS-FOUND          PIC X(1)    VALUE 'N'.
+           05 WS-REPORT-Q       PIC 9(4).
+           05 WS-REPORT-C       PIC 9(5)V99.
+           05 WS-ERRORS         PIC 9(4)    VALUE 0.
+
       *    *************************************************************
       *
       *    Homeware City Storage variables
@@ -104,8 +108,8 @@
            05 HWC-CODE   PIC 9(2).
            05 SCT-INDEX  PIC 9(10).
            05 SCT-COUNT  PIC 9(10).
-      *    05 SCT-IDX    PIC 9(4).
            05 SCT-IDXC   PIC 9(4).
+           05 SCR-IDXC   PIC 9(4).
       *    *************************************************************
       *
       *    Data structures for the tables
@@ -126,16 +130,26 @@
              10 PCH-PROD    PIC X(35)   VALUE "PRODUCT NAME".
              10 PCH-PRICE   PIC X(8)    VALUE "$  PRICE".
            
-           05 SHOPPING-CART-TABLE OCCURS 1000 TIMES.
-             10 SCT-MEMBER    PIC X(3).
-             10 SCT-CODE      PIC 9(4).
-             10 SCT-PRODUCT   PIC X(35).
-             10 SCT-PRICE     PIC 9(5)V9(2).
-             10 SCT-QUANTITY  PIC 9(2).
-             10 SCT-METHOD    PIC X(15).
-             10 SCT-FEE       PIC 9(5)V99.
-             10 SCT-COST      PIC 9(5)V99.
+      *    05 SHOPPING-CART-TABLE OCCURS 1000 TIMES.
+      *      10 SCT-MEMBER    PIC X(3).
+      *      10 SCT-CODE      PIC 9(4).
+      *      10 SCT-PRODUCT   PIC X(35).
+      *      10 SCT-PRICE     PIC 9(5)V9(2).
+      *      10 SCT-QUANTITY  PIC 9(2).
+      *      10 SCT-METHOD    PIC X(15).
+      *      10 SCT-FEE       PIC 9(5)V99.
+      *      10 SCT-COST      PIC 9(5)V99.
            
+           05 SHOPTING-CART-TABLE-HEADERS.
+             10 SCTH-MEMBER    PIC X(10)    VALUE "MEMBER".
+             10 SCTH-CODE      PIC X(4)     VALUE "CODE".
+             10 SCTH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+             10 SCTH-PRICE     PIC X(8)     VALUE "$  PRICE".
+             10 SCTH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+             10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
+             10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
+             10 SCTH-COST      PIC X(8)     VALUE "$   COST".
+
            05 SHOPPING-CART-TABLE-INDEXED OCCURS 9999 TIMES
                ASCENDING KEY IS SCTI-CODE
                INDEXED BY SCT-IDX.
@@ -147,6 +161,14 @@
              10 SCTI-METHOD    PIC X(15).
              10 SCTI-FEE       PIC 9(5)V99.
              10 SCTI-COST      PIC 9(5)V99.
+
+           05 SHOPPING-CART-REPORT-INDEX OCCURS 9999 TIMES
+               INDEXED BY SCR-IDX.
+             10 SCRI-CODE      PIC 9(4).
+             10 SCRI-PRODUCT   PIC X(35).
+             10 SCRI-PRICE     PIC 9(5)V99.
+             10 SCRI-QUANTITY  PIC 9(4).
+             10 SCRI-COST      PIC 9(5)V99.
            
            05 TEMP-CART.
              10 FILLER    PIC X(3).
@@ -159,14 +181,15 @@
              10 FILLER    PIC 9(5)V99.  
            
            05 SHOPPING-CART-DISPLAY.
-             10 SDC-MEMBER    PIC X(3).
+             10 SDC-MEMBER    PIC X(10).
              10 SCD-CODE      PIC Z(4).
              10 SCD-PRODUCT   PIC X(35).
              10 SCD-PRICE     PIC Z(5).99.
-             10 SCD-QUANTITY  PIC Z(2).
+             10 SCD-QUANTITY  PIC Z(8).
              10 SCD-METHOD    PIC X(15).
-             10 SCD-FEE       PIC Z(5).99.
+             10 SCD-FEE       PIC Z(9).99.
              10 SCD-COST      PIC Z(5).99.
+             10 SCD-TOTAL     PIC Z(5).99.
       
       *    *************************************************************
       *
@@ -175,24 +198,22 @@
       *    *************************************************************
        
        PROCEDURE DIVISION.
-      *    PERFORM QUERY-USER-VERSION
+      *    REQUIRED FUNCTION
            PERFORM BUILD-CATALOGUE-TABLE
-           PERFORM PROCESS-SHOPPING-CART
-           DISPLAY SCT-IDXC
-           
-           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
-           DISPLAY " ... "
-           PERFORM SORT-TABLE
-           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+      *    REQUIRED FUNCTION
+
+      *    PERFORM QUERY-USER-VERSION
+           PERFORM QUERY-NON-INTERACTIVE-VERSION
 
       *    PERFORM BUILD-CATALOGUE-TABLE
+      *    PERFORM PROCESS-SHOPPING-CART
       *    
-      *    PERFORM UNTIL WS-MEMBER-RESP EQUAL "END"
-      *      PERFORM QUERY-IS-MEMBER
-      *      IF WS-MEMBER-RESP NOT EQUAL "END"
-      *        DISPLAY WS-MEMBER-RESP
-      *      END-IF
-      *    END-PERFORM
+      *    PERFORM SORT-TABLE
+      *    PERFORM GENERATE-SHIPPING-REPORT
+      *    PERFORM DISPLAY-SHIPPING-REPORT
+      **    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+      *    DISPLAY " "
+      *    DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
 
            STOP RUN.
        
@@ -205,7 +226,6 @@
        QUERY-USER-VERSION.
       *    Commented out as this need to be done regardless of 
       *    automation of manual input
-      *    PERFORM BUILD-CATALOGUE-TABLE
            MOVE 1 TO SCT-INDEX
            SET SCT-IDX TO 1
 
@@ -230,7 +250,21 @@
            PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
       *    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE.
            .
+       
+       QUERY-NON-INTERACTIVE-VERSION.
+           PERFORM PROCESS-SHOPPING-CART
+           
+           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+           
+           DISPLAY " "
 
+           PERFORM SORT-TABLE
+           PERFORM GENERATE-SHIPPING-REPORT
+           PERFORM DISPLAY-SHIPPING-REPORT
+
+           DISPLAY " "
+           DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
+       .
       *    *************************************************************
       *
       *    Consolidate the data into the data
@@ -240,23 +274,23 @@
       *
       *    *************************************************************
 
-       CONSOLIDATE-DATA-TO-TABLE.
-           MOVE WS-MEMBER-RESP TO SCT-MEMBER(SCT-INDEX)
-           MOVE WS-PRODUCT-CODE TO SCT-CODE(SCT-INDEX)
-           MOVE WS-PRODUCT-DESC TO SCT-PRODUCT(SCT-INDEX)
-           MOVE WS-PRODUCT-PRICE TO SCT-PRICE(SCT-INDEX)
-           MOVE WS-QUANT-NUM TO SCT-QUANTITY(SCT-INDEX)
-           MOVE WS-DELIVERY TO SCT-METHOD(SCT-INDEX)
-           MOVE WS-SHIP-FEE TO SCT-FEE(SCT-INDEX)
-           MOVE WS-COST TO SCT-COST(SCT-INDEX)
-
-           ADD 1 TO SCT-INDEX
-           MOVE SCT-INDEX TO SCT-COUNT
-           IF SCT-INDEX EQUAL 9000 THEN
-             DISPLAY "*** WARNING: " SCT-INDEX 
-                     " RECORDS OF " WS-MAX " ***"
-           END-IF
-       .
+      *CONSOLIDATE-DATA-TO-TABLE.
+      *    MOVE WS-MEMBER-RESP TO SCT-MEMBER(SCT-INDEX)
+      *    MOVE WS-PRODUCT-CODE TO SCT-CODE(SCT-INDEX)
+      *    MOVE WS-PRODUCT-DESC TO SCT-PRODUCT(SCT-INDEX)
+      *    MOVE WS-PRODUCT-PRICE TO SCT-PRICE(SCT-INDEX)
+      *    MOVE WS-QUANT-NUM TO SCT-QUANTITY(SCT-INDEX)
+      *    MOVE WS-DELIVERY TO SCT-METHOD(SCT-INDEX)
+      *    MOVE WS-SHIP-FEE TO SCT-FEE(SCT-INDEX)
+      *    MOVE WS-COST TO SCT-COST(SCT-INDEX)
+      *
+      *    ADD 1 TO SCT-INDEX
+      *    MOVE SCT-INDEX TO SCT-COUNT
+      *    IF SCT-INDEX EQUAL 9000 THEN
+      *      DISPLAY "*** WARNING: " SCT-INDEX 
+      *              " RECORDS OF " WS-MAX " ***"
+      *    END-IF
+      *.
 
        CONSOLIDATE-DATA-TO-TABLE-INDEXED.
            MOVE WS-MEMBER-RESP TO SCTI-MEMBER(SCT-IDX)
@@ -283,34 +317,134 @@
       *
       *    *************************************************************
 
-       DISPLAY-CONSOLIDATED-DATA-TABLE.
-           MOVE 1 TO SCT-INDEX
-
-           PERFORM UNTIL SCT-INDEX EQUAL SCT-COUNT
-             DISPLAY SCT-MEMBER(SCT-INDEX) WS-GAP
-                     SCT-CODE(SCT-INDEX) WS-GAP
-                     SCT-PRODUCT(SCT-INDEX) WS-GAP
-                     SCT-PRICE(SCT-INDEX) WS-GAP
-                     SCT-QUANTITY(SCT-INDEX) WS-GAP
-                     SCT-METHOD(SCT-INDEX) WS-GAP
-                     SCT-FEE(SCT-INDEX) WS-GAP
-                     SCT-COST(SCT-INDEX)
-             ADD 1 TO SCT-INDEX
-           END-PERFORM.
+      *DISPLAY-CONSOLIDATED-DATA-TABLE.
+      *    MOVE 1 TO SCT-INDEX
+      *
+      *    PERFORM UNTIL SCT-INDEX EQUAL SCT-COUNT
+      *      DISPLAY SCT-MEMBER(SCT-INDEX) WS-GAP
+      *              SCT-CODE(SCT-INDEX) WS-GAP
+      *              SCT-PRODUCT(SCT-INDEX) WS-GAP
+      *              SCT-PRICE(SCT-INDEX) WS-GAP
+      *              SCT-QUANTITY(SCT-INDEX) WS-GAP
+      *              SCT-METHOD(SCT-INDEX) WS-GAP
+      *              SCT-FEE(SCT-INDEX) WS-GAP
+      *              SCT-COST(SCT-INDEX)
+      *      ADD 1 TO SCT-INDEX
+      *    END-PERFORM.
        
        DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
+           MOVE 0 TO WS-TOTAL-COST
+           DISPLAY SCTH-MEMBER WS-GAP
+                     SCTH-CODE WS-GAP
+                     SCTH-PRODUCT WS-GAP
+                     SCTH-PRICE WS-GAP
+                     SCTH-QUANTITY WS-GAP
+                     SCTH-METHOD WS-GAP
+                     SCTH-FEE WS-GAP
+                     SCTH-COST
+
            PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX 
                    EQUAL SCT-IDXC
-           DISPLAY SCTI-MEMBER(SCT-IDX) WS-GAP
-                   SCTI-CODE(SCT-IDX) WS-GAP
-                   SCTI-PRODUCT(SCT-IDX) WS-GAP
-                   SCTI-PRICE(SCT-IDX) WS-GAP
-                   SCTI-QUANTITY(SCT-IDX) WS-GAP
-                   SCTI-METHOD(SCT-IDX) WS-GAP
-                   SCTI-FEE(SCT-IDX) WS-GAP
-                   SCTI-COST(SCT-IDX)
+             MOVE SCTI-MEMBER(SCT-IDX) TO SDC-MEMBER
+             MOVE SCTI-CODE(SCT-IDX) TO SCD-CODE
+             MOVE SCTI-PRODUCT(SCT-IDX) TO SCD-PRODUCT
+             MOVE SCTI-PRICE(SCT-IDX) TO SCD-PRICE
+             MOVE SCTI-QUANTITY(SCT-IDX) TO SCD-QUANTITY
+             MOVE SCTI-METHOD(SCT-IDX) TO SCD-METHOD
+             MOVE SCTI-FEE(SCT-IDX) TO SCD-FEE
+             MOVE SCTI-COST(SCT-IDX) TO SCD-COST
+             COMPUTE WS-TOTAL-COST = WS-TOTAL-COST + SCTI-COST(SCT-IDX)
+
+             DISPLAY SDC-MEMBER WS-GAP
+                     SCD-CODE WS-GAP
+                     SCD-PRODUCT WS-GAP
+                     SCD-PRICE WS-GAP
+                     SCD-QUANTITY WS-GAP
+                     SCD-METHOD WS-GAP
+                     SCD-FEE WS-GAP
+                     SCD-COST
+           END-PERFORM
+           
+           DISPLAY " "
+           MOVE WS-TOTAL-COST TO SCD-TOTAL
+           DISPLAY "TOTAL: $" SCD-TOTAL
+           .
+
+       GENERATE-SHIPPING-REPORT.
+           MOVE 1 TO SCR-IDXC
+           MOVE "N" TO WS-FOUND
+
+           PERFORM VARYING SCT-IDX FROM 1 BY 1
+                   UNTIL SCT-IDX EQUAL SCT-IDXC
+             PERFORM VARYING SCR-IDX FROM 1 BY 1 
+                     UNTIL SCR-IDX EQUAL SCR-IDXC
+               IF SCRI-CODE(SCR-IDX) EQUAL SCTI-CODE(SCT-IDX) THEN
+                 COMPUTE WS-REPORT-Q = SCRI-QUANTITY(SCR-IDX) +
+                                       SCTI-QUANTITY(SCT-IDX)
+                 COMPUTE WS-REPORT-C = SCRI-COST(SCR-IDX) +
+                                       SCTI-COST(SCT-IDX)
+                 MOVE WS-REPORT-Q TO SCRI-QUANTITY(SCR-IDX)
+                 MOVE WS-REPORT-C TO SCRI-COST(SCR-IDX)
+
+                 MOVE "Y" TO WS-FOUND
+                 EXIT PERFORM
+               END-IF
+             END-PERFORM
+
+             IF WS-FOUND EQUAL "N" THEN
+               MOVE SCTI-CODE(SCT-IDX) TO SCRI-CODE(SCR-IDX)
+               MOVE SCTI-PRODUCT(SCT-IDX) TO SCRI-PRODUCT(SCR-IDX)
+               MOVE SCTI-PRICE(SCT-IDX) TO SCRI-PRICE(SCR-IDX)
+               MOVE SCTI-QUANTITY(SCT-IDX) TO SCRI-QUANTITY(SCR-IDX)
+               MOVE SCTI-COST(SCT-IDX) TO SCRI-COST(SCR-IDX)
+               ADD 1 TO SCR-IDXC
+             END-IF
+             MOVE "N" TO WS-FOUND
+           END-PERFORM
+       .
+
+       GENERATE-SHIPPING-REPORT-ORG.
+           MOVE 1 TO SCR-IDXC
+
+           PERFORM VARYING SCT-IDX FROM 1 BY 1 
+                   UNTIL SCT-IDX EQUAL SCT-IDXC
+             MOVE "N" TO WS-FOUND
+             
+             PERFORM VARYING SCR-IDX FROM 1 BY 1 
+                     UNTIL SCR-IDX EQUAL SCR-IDXC
+                     OR WS-FOUND EQUAL "Y"
+             
+               IF SCRI-CODE(SCR-IDX) EQUAL SCTI-CODE(SCT-IDX) THEN
+                 COMPUTE SCRI-QUANTITY(SCR-IDX) =
+                         SCRI-QUANTITY(SCR-IDX) + SCTI-QUANTITY(SCT-IDX)
+                 COMPUTE SCRI-COST(SCR-IDX) = 
+                         SCRI-COST(SCR-IDX) + SCTI-COST(SCT-IDX)
+                 MOVE "Y" TO WS-FOUND
+               END-IF
+             END-PERFORM
+
+             IF WS-FOUND EQUAL "N" THEN
+               MOVE SCTI-CODE(SCT-IDX) TO SCRI-CODE(SCR-IDX)
+               MOVE SCTI-PRODUCT(SCT-IDX) TO SCRI-PRODUCT(SCR-IDX)
+               MOVE SCTI-PRICE(SCT-IDX) TO SCRI-PRICE(SCR-IDX)
+               MOVE SCTI-QUANTITY(SCT-IDX) TO SCRI-QUANTITY(SCR-IDX)
+               MOVE SCTI-COST(SCT-IDX) TO SCRI-COST(SCR-IDX)
+               ADD 1 TO SCR-IDXC
+             END-IF
            END-PERFORM.
 
+       DISPLAY-SHIPPING-REPORT.
+           SET SCR-IDX TO 1
+
+           PERFORM VARYING SCR-IDX FROM 1 BY 1 
+                                           UNTIL SCR-IDX EQUAL SCR-IDXC
+             DISPLAY SCRI-CODE(SCR-IDX) WS-GAP
+                     SCRI-PRODUCT(SCR-IDX) WS-GAP
+                     SCRI-PRICE(SCR-IDX) WS-GAP
+                     SCRI-QUANTITY(SCR-IDX) WS-GAP
+                     SCRI-COST(SCR-IDX)
+           END-PERFORM
+       .
       *    *************************************************************
       *
       *    Build the product catalogue database from the product list and
@@ -396,6 +530,7 @@
                  END-IF
       *          MOVE 'Y' TO WS-RESP-OK
                  IF WS-DISP-ERR EQUAL "Y" THEN
+                   ADD 1 TO WS-ERRORS
                    DISPLAY "FIX ENTRY ON LINE: " WS-CART-LINE WS-GAP
                            "ERROR: " WS-DISP-MSG
                  END-IF
