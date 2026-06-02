@@ -152,7 +152,10 @@
       *    Data structures for the tables
       *
       *    *************************************************************
-
+           
+           05 ERROR-LOG OCCURS 9999 TIMES INDEXED BY ERR-IDX.
+             10 EL-MESSAGE          PIC X(80).
+             10 EL-LINE             PIC 9(7).
       *    *************************************************************
       *
       *    Product Catalogue Table Data structures
@@ -254,6 +257,13 @@
              10 SCRI-PRICE     PIC 9(5)V99.
              10 SCRI-QUANTITY  PIC 9(4).
              10 SCRI-COST      PIC 9(5)V99.
+           
+           05 SHOPPING-CART-REPORT-DISPLAY.
+             10 SCRD-CODE      PIC Z(4).
+             10 SCRD-PRODUCT   PIC X(35).
+             10 SCRD-PRICE     PIC Z(5).99.
+             10 SCRD-QUANTITY  PIC Z(8).
+             10 SCRD-COST      PIC Z(5).99.
 
       *    *************************************************************
       *
@@ -304,10 +314,16 @@
            PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
       *    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE.
            .
-       
+      
+      *    *************************************************************
+      *
+      *    Non-user interactive version of the code
+      *
+      *    ************************************************************* 
        QUERY-NON-INTERACTIVE-VERSION.
            PERFORM PROCESS-SHOPPING-CART
            
+           DISPLAY " "
            PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
            
            DISPLAY " "
@@ -318,6 +334,14 @@
 
            DISPLAY " "
            DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
+
+           PERFORM VARYING ERR-IDX FROM 1 BY 1 
+                                   UNTIL ERR-IDX EQUAL WS-ERRORS
+             DISPLAY "ERROR ON LINE: "
+                     EL-LINE(ERR-IDX)
+                     " ERROR: "
+                     EL-MESSAGE(ERR-IDX)
+           END-PERFORM
        .
       *    *************************************************************
       *
@@ -328,6 +352,7 @@
       *
       *    *************************************************************
 
+      *    Consolidate the non-indexed table
       *CONSOLIDATE-DATA-TO-TABLE.
       *    MOVE WS-MEMBER-RESP TO SCT-MEMBER(SCT-INDEX)
       *    MOVE WS-PRODUCT-CODE TO SCT-CODE(SCT-INDEX)
@@ -340,12 +365,14 @@
       *
       *    ADD 1 TO SCT-INDEX
       *    MOVE SCT-INDEX TO SCT-COUNT
+      **   Display a warning message at 9000 records
       *    IF SCT-INDEX EQUAL 9000 THEN
       *      DISPLAY "*** WARNING: " SCT-INDEX 
       *              " RECORDS OF " WS-MAX " ***"
       *    END-IF
       *.
 
+      *    Consolidate the indexed table
        CONSOLIDATE-DATA-TO-TABLE-INDEXED.
            MOVE WS-MEMBER-RESP TO SCTI-MEMBER(SCT-IDX)
            MOVE WS-PRODUCT-CODE TO SCTI-CODE(SCT-IDX) 
@@ -359,6 +386,7 @@
            SET SCT-IDX UP BY 1
            MOVE SCT-IDX TO SCT-IDXC
 
+      *    Display a warning message at 9000 records
            IF SCT-IDXC EQUAL 9000 THEN
              DISPLAY "*** WARNING: " SCT-IDXC 
                      " RECORDS OF " WS-MAX " ***"
@@ -370,7 +398,8 @@
       *    Display the consolidated data
       *
       *    *************************************************************
-
+      
+      *    Display the non-index table
       *DISPLAY-CONSOLIDATED-DATA-TABLE.
       *    MOVE 1 TO SCT-INDEX
       *
@@ -386,6 +415,7 @@
       *      ADD 1 TO SCT-INDEX
       *    END-PERFORM.
        
+      * Display the indexed table
        DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
            MOVE 0 TO WS-TOTAL-COST
            DISPLAY SCTH-MEMBER WS-GAP
@@ -423,7 +453,14 @@
            MOVE WS-TOTAL-COST TO SCTD-TOTAL
            DISPLAY "TOTAL: $" SCTD-TOTAL
            .
+      
+      *    *************************************************************
+      *
+      *    Generate the shipping and dispatch reports
+      *
+      *    *************************************************************
 
+      *    Generate the shipping report
        GENERATE-SHIPPING-REPORT.
            MOVE 1 TO SCR-IDXC
            MOVE "N" TO WS-FOUND
@@ -457,6 +494,7 @@
            END-PERFORM
        .
 
+      *    Original code, but modified by Copilot
        GENERATE-SHIPPING-REPORT-ORG.
            MOVE 1 TO SCR-IDXC
 
@@ -487,16 +525,29 @@
              END-IF
            END-PERFORM.
 
+      *    Display the shipping and dispatch report
        DISPLAY-SHIPPING-REPORT.
            SET SCR-IDX TO 1
 
+           DISPLAY SCTH-CODE WS-GAP
+                   SCTH-PRODUCT WS-GAP
+                   SCTH-PRICE WS-GAP
+                   SCTH-QUANTITY WS-GAP
+                   SCTH-COST
+
            PERFORM VARYING SCR-IDX FROM 1 BY 1 
                                            UNTIL SCR-IDX EQUAL SCR-IDXC
-             DISPLAY SCRI-CODE(SCR-IDX) WS-GAP
-                     SCRI-PRODUCT(SCR-IDX) WS-GAP
-                     SCRI-PRICE(SCR-IDX) WS-GAP
-                     SCRI-QUANTITY(SCR-IDX) WS-GAP
-                     SCRI-COST(SCR-IDX)
+             MOVE SCRI-CODE(SCR-IDX) TO SCRD-CODE
+             MOVE SCRI-PRODUCT(SCR-IDX) TO SCRD-PRODUCT
+             MOVE SCRI-PRICE(SCR-IDX) TO SCRD-PRICE
+             MOVE SCRI-QUANTITY(SCR-IDX) TO SCRD-QUANTITY
+             MOVE SCRI-COST(SCR-IDX) TO SCRD-COST
+
+             DISPLAY SCRD-CODE WS-GAP
+                     SCRD-PRODUCT WS-GAP
+                     SCRD-PRICE WS-GAP
+                     SCRD-QUANTITY WS-GAP
+                     SCRD-COST
            END-PERFORM
        .
       *    *************************************************************
@@ -535,6 +586,8 @@
        PROCESS-SHOPPING-CART.
            MOVE "N" TO WS-EOF01
            MOVE "Y" TO WS-SILENT
+           SET ERR-IDX TO 1
+
            OPEN INPUT CSV-SHOPPING-CART-FILE.
            PERFORM UNTIL WS-EOF01 EQUAL 'Y'
              READ CSV-SHOPPING-CART-FILE
@@ -585,8 +638,11 @@
       *          MOVE 'Y' TO WS-RESP-OK
                  IF WS-DISP-ERR EQUAL "Y" THEN
                    ADD 1 TO WS-ERRORS
-                   DISPLAY "FIX ENTRY ON LINE: " WS-CART-LINE WS-GAP
-                           "ERROR: " WS-DISP-MSG
+      *            DISPLAY "FIX ENTRY ON LINE: " WS-CART-LINE WS-GAP
+      *                    "ERROR: " WS-DISP-MSG
+                   MOVE WS-CART-LINE TO EL-LINE(ERR-IDX)
+                   MOVE WS-DISP-MSG TO EL-MESSAGE(ERR-IDX)
+                   SET ERR-IDX UP BY 1
                  END-IF
              END-READ
            END-PERFORM
@@ -703,6 +759,7 @@
            PERFORM VALIDATE-MEMBER
        .
 
+      *    Validate whether the reponse is valid or not
        VALIDATE-MEMBER.
            EVALUATE WS-MEMBER-RESP
              WHEN "YES"
@@ -756,7 +813,9 @@
              PERFORM SEARCH-PRODUCT-CODE
            END-IF
        .
-
+      
+      *    Ensure that the product code is between the ranges of
+      *    1 and 40
        VALIDATE-PRODUCT-CODE.
            EVALUATE TRUE
              WHEN WS-PRODUCT-NUM GREATER 0 AND WS-PRODUCT-NUM LESS 41
@@ -829,6 +888,7 @@
            PERFORM VALIDATE-QUANTITY
        .
 
+      *    Ensure that the quantity is between the ranges of 1 and 29
        VALIDATE-QUANTITY.
            EVALUATE TRUE
             WHEN WS-QUANT-NUM GREATER 0 AND LESS 30
@@ -873,19 +933,20 @@
        PROCESS-DELIVERY.
            MOVE 'N' TO WS-RESP-OK
            PERFORM VALIDATE-DELIVERY-METHOD
-           PERFORM PROCESS-DELIVERY-METHOD
+      *    PERFORM PROCESS-DELIVERY-METHOD
        .
 
+      *    Validate that the appropraite delivery method is chosen
        VALIDATE-DELIVERY-METHOD.
            EVALUATE WS-DELIVERY
       *      WHEN "DELIVERY"
              WHEN WS-DEL
                MOVE "Y" TO WS-RESP-OK
-               MOVE 1 TO WS-DELIVERY-NUM
+      *        MOVE 1 TO WS-DELIVERY-NUM
       *      WHEN "PICK-UP"
              WHEN WS-PU
                MOVE "Y" TO WS-RESP-OK
-               MOVE 2 TO WS-DELIVERY-NUM
+      *        MOVE 2 TO WS-DELIVERY-NUM
              WHEN OTHER
                IF WS-SILENT EQUAL "N" THEN
                  DISPLAY "INVALID DELIVERY METHOD. " 
@@ -893,6 +954,8 @@
                END-IF
            END-EVALUATE.
 
+      *    This is used to determine the what type of delivery method
+      *    was used for calculations
        PROCESS-DELIVERY-METHOD.
            MOVE 0 TO WS-DELIVERY-NUM
            IF WS-DELIVERY EQUAL WS-DEL THEN
@@ -907,10 +970,14 @@
       *
       *    *************************************************************
 
+      *    Calculate shipping fee based on what delivery method used,
+      *    quantity, and if the base rate is the only factor or if the 
+      *    base and subsequent item fee applies.
        CALCULATE-SHIP-FEE.
            MOVE 0 TO WS-SHIP-FEE
            
-           IF WS-DELIVERY-NUM EQUAL 1 THEN
+      *    IF WS-DELIVERY-NUM EQUAL 1 THEN
+           IF WS-DELIVERY EQUAL WS-DEL THEN
              IF WS-QUANT-NUM GREATER THAN 1 THEN
                COMPUTE WS-SHIP-FEE = 2.00 + 
                        (( WS-QUANT-NUM - 1 ) * 1.60)
@@ -919,6 +986,9 @@
              END-IF
            END-IF.
 
+      *    Calculate the cost using the above shipping fee added to the
+      *    quantity multiplied by the price.  Then if the customer is a
+      *    member, apply a discount.
        CALCULATE-COST.
            MOVE 0 TO WS-COST
 
@@ -948,6 +1018,7 @@
            END-PERFORM
        .
 
+      *    Swap the records around using a temporary table.
        SWAP-RECORD.
            MOVE SHOPPING-CART-TABLE-INDEXED(I) TO TEMP-CART
            MOVE SHOPPING-CART-TABLE-INDEXED(J) TO
