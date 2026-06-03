@@ -1,6 +1,6 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. SHOP-CART.
-           AUTHOR "Wayne Jackson".
+       AUTHOR "Wayne Jackson".
        
        ENVIRONMENT DIVISION.
        INPUT-OUTPUT SECTION.
@@ -127,6 +127,9 @@
            05 WS-REPORT-C       PIC 9(5)V99.
       *    Total errors detected
            05 WS-ERRORS         PIC 9(4)    VALUE 0.
+      *    Query if the program is to run interactively or note
+           05 WS-INTERACT-RESP  PIC X(1)    VALUE SPACE.
+             
 
       *    *************************************************************
       *
@@ -276,8 +279,24 @@
            PERFORM BUILD-CATALOGUE-TABLE
       *    REQUIRED FUNCTION
 
-      *    PERFORM QUERY-USER-VERSION
-           PERFORM QUERY-NON-INTERACTIVE-VERSION
+           DISPLAY "IS THIS TO BE RUN INTERACTIVELY OR " 
+                   "NON-INTERACTIVELY? (Y/N): "
+                   WITH NO ADVANCING
+           ACCEPT WS-INTERACT-RESP
+           
+           EVALUATE TRUE
+            WHEN WS-INTERACT-RESP = "Y"
+              PERFORM QUERY-USER-VERSION
+            WHEN WS-INTERACT-RESP = "N"
+              PERFORM QUERY-NON-INTERACTIVE-VERSION
+            WHEN OTHER
+              DISPLAY "GOOD BYE."
+           END-EVALUATE.
+           
+      *    IF WS-INTERACT-RESP EQUAL "Y" THEN
+      *      PERFORM QUERY-USER-VERSION
+      *    END-IF
+      *    PERFORM QUERY-NON-INTERACTIVE-VERSION
 
            STOP RUN.
        
@@ -311,8 +330,9 @@
            PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
            DISPLAY " ... "
            PERFORM SORT-TABLE
-           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
-      *    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE.
+           PERFORM GENERATE-SHIPPING-REPORT
+           PERFORM DISPLAY-SHIPPING-REPORT
+      
            .
       
       *    *************************************************************
