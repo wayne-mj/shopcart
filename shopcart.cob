@@ -1,6 +1,6 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. SHOP-CART.
-           AUTHOR "Wayne Jackson".
+       AUTHOR "Wayne Jackson".
        
        ENVIRONMENT DIVISION.
        INPUT-OUTPUT SECTION.
@@ -25,6 +25,7 @@
       *    Variables and other related items for files
       *
       *    *************************************************************
+
        FILE SECTION.
       * File descriptor for CSV file
        FD  CSV-PRODUCT-FILE.
@@ -58,13 +59,19 @@
       *
       *    *************************************************************
            
+      *    Gap between headers and columns
        01  WS-GAP      PIC X(4) VALUE SPACES.
+      *    Debug gap to check if the gap is looking right
       *01  WS-GAP      PIC X(4) VALUE "....".
+      *    Variable to track the columns
        01  WS-COLS     PIC 9.
+      *    Max table depth
        01  WS-MAX      PIC 9(4) VALUE 9999.
+      *    Variables for Bubble sort
        01  I           PIC 9(4) VALUE 0.
        01  J           PIC 9(4) VALUE 0.
 
+      *    So I do not have to type over and over and over again
        01  WS-DELIVERY-METHODS.
            05 WS-DEL   PIC X(8) VALUE "DELIVERY".
            05 WS-PU    PIC X(7) VALUE "PICK-UP".
@@ -75,28 +82,54 @@
       *
       *    *************************************************************
        01  WS-REQUIRED-VARIABLES.
+      *    Used to track what line errors occurred in the source cart
            05 WS-CART-LINE      PIC 9(7)    VALUE 0.
+      *    Boolean variable to track if to display an error message
            05 WS-DISP-ERR       PIC X(1)    VALUE "N".
+      *    Buffer for the error message
            05 WS-DISP-MSG       PIC X(15)   VALUE SPACES.
+      *    Boolean variable to determine if the response is OK or not
            05 WS-RESP-OK        PIC X(1)    VALUE 'N'.
+      *    Boolean to determine if silent operation
            05 WS-SILENT         PIC X(1)    VALUE 'N'.
+      *    Member YES/NO/END
            05 WS-MEMBER-RESP    PIC X(3)    VALUE SPACES.
+      *    Product Code as string
            05 WS-PRODUCT-RESP   PIC X(2)    VALUE SPACES.
+      *    Product code as number
            05 WS-PRODUCT-NUM    PIC 9(2)    VALUE 0.
+      *    Formatted product code
            05 WS-PRODUCT-CODE   PIC 9(4)    VALUE 0.
+      *    Product description
            05 WS-PRODUCT-DESC   PIC X(35)   VALUE SPACES.
+      *    Formatted product price
            05 WS-PRODUCT-PRICE  PIC 9(5)V99 VALUE 0.
+      *    Quantity as string
            05 WS-QUANT-RESP     PIC X(2)    VALUE SPACES.
+      *    Quantity as number
            05 WS-QUANT-NUM      PIC 9(2)    VALUE 0.
+      *    DELIVERY/PICK-UP
            05 WS-DELIVERY       PIC X(15)   VALUE SPACES.
+      *    Numerical indicator for DELIVERY/PICK-UP 1 OR 2
            05 WS-DELIVERY-NUM   PIC 9       VALUE 0.
+      *    Calculated shipping fee formatted
            05 WS-SHIP-FEE       PIC 9(5)V99 VALUE 0.
+      *    Calculated cost formatted
            05 WS-COST           PIC 9(5)V99 VALUE 0.
+      *    Calculated total cost formatted
            05 WS-TOTAL-COST     PIC 9(5)V99 VALUE 0.
+      *    Used for the report generation to indicate if a record has 
+      *    been found
            05 WS-FOUND          PIC X(1)    VALUE 'N'.
+      *    Calculated quantity
            05 WS-REPORT-Q       PIC 9(4).
+      *    Calculated cost
            05 WS-REPORT-C       PIC 9(5)V99.
+      *    Total errors detected
            05 WS-ERRORS         PIC 9(4)    VALUE 0.
+      *    Query if the program is to run interactively or note
+           05 WS-INTERACT-RESP  PIC X(1)    VALUE SPACE.
+             
 
       *    *************************************************************
       *
@@ -104,27 +137,47 @@
       *
       *    *************************************************************
        01  HOMEWARECITY-STORAGE.
+      *    Manual indexing of the product table
            05 HWC-INDEX  PIC 9(10).
+      *    Manual calculation of the product code
            05 HWC-CODE   PIC 9(2).
+      *    Shopping cart table index manual method
            05 SCT-INDEX  PIC 9(10).
+      *    Count of the table for the shopping cart
            05 SCT-COUNT  PIC 9(10).
+      *    Index counter for Shopping Cart Table
            05 SCT-IDXC   PIC 9(4).
+      *    Index counter for Shopping Cart Report
            05 SCR-IDXC   PIC 9(4).
+
       *    *************************************************************
       *
       *    Data structures for the tables
       *
       *    *************************************************************
+           
+           05 ERROR-LOG OCCURS 9999 TIMES INDEXED BY ERR-IDX.
+             10 EL-MESSAGE          PIC X(80).
+             10 EL-LINE             PIC 9(7).
+      *    *************************************************************
+      *
+      *    Product Catalogue Table Data structures
+      *
+      *    *************************************************************
+
+      *    Structure for Product catalogue table
            05 PRODUCT-CATALOGUE-TABLE OCCURS 40 TIMES.
              10 PCT-CODE            PIC 9(4).
              10 PCT-PRODUCT         PIC X(35).
              10 PCT-PRICE           PIC 9(5)V99.
            
+      *    Structure for displaying the data structure
            05 PRODUCT-CATALOGUE-DISPLAY.
              10 PCD-CODE            PIC Z(4).
              10 PCD-PRODUCT         PIC X(35).
              10 PCD-PRICE           PIC Z(5).99.
            
+      *    Structure for the headers
            05 PRODUCT-CATALOGUE-HEADERS.
              10 PCH-CODE    PIC X(4)    VALUE "CODE".
              10 PCH-PROD    PIC X(35)   VALUE "PRODUCT NAME".
@@ -139,17 +192,14 @@
       *      10 SCT-METHOD    PIC X(15).
       *      10 SCT-FEE       PIC 9(5)V99.
       *      10 SCT-COST      PIC 9(5)V99.
-           
-           05 SHOPTING-CART-TABLE-HEADERS.
-             10 SCTH-MEMBER    PIC X(10)    VALUE "MEMBER".
-             10 SCTH-CODE      PIC X(4)     VALUE "CODE".
-             10 SCTH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
-             10 SCTH-PRICE     PIC X(8)     VALUE "$  PRICE".
-             10 SCTH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
-             10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
-             10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
-             10 SCTH-COST      PIC X(8)     VALUE "$   COST".
 
+      *    *************************************************************
+      *
+      *    Shopping Cart Table Data structures
+      *
+      *    *************************************************************
+           
+      *    Structure of table shopping cart
            05 SHOPPING-CART-TABLE-INDEXED OCCURS 9999 TIMES
                ASCENDING KEY IS SCTI-CODE
                INDEXED BY SCT-IDX.
@@ -162,14 +212,30 @@
              10 SCTI-FEE       PIC 9(5)V99.
              10 SCTI-COST      PIC 9(5)V99.
 
-           05 SHOPPING-CART-REPORT-INDEX OCCURS 9999 TIMES
-               INDEXED BY SCR-IDX.
-             10 SCRI-CODE      PIC 9(4).
-             10 SCRI-PRODUCT   PIC X(35).
-             10 SCRI-PRICE     PIC 9(5)V99.
-             10 SCRI-QUANTITY  PIC 9(4).
-             10 SCRI-COST      PIC 9(5)V99.
+      *    Structure for headers for shopping cart
+           05 SHOPTING-CART-TABLE-HEADERS.
+             10 SCTH-MEMBER    PIC X(10)    VALUE "MEMBER".
+             10 SCTH-CODE      PIC X(4)     VALUE "CODE".
+             10 SCTH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+             10 SCTH-PRICE     PIC X(8)     VALUE "$  PRICE".
+             10 SCTH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+             10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
+             10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
+             10 SCTH-COST      PIC X(8)     VALUE "$   COST".
+
+      *    Display data structure for shopping cart
+           05 SHOPPING-CART-TABLE-DISPLAY.
+             10 SCTD-MEMBER    PIC X(10).
+             10 SCTD-CODE      PIC Z(4).
+             10 SCTD-PRODUCT   PIC X(35).
+             10 SCTD-PRICE     PIC Z(5).99.
+             10 SCTD-QUANTITY  PIC Z(8).
+             10 SCTD-METHOD    PIC X(15).
+             10 SCTD-FEE       PIC Z(9).99.
+             10 SCTD-COST      PIC Z(5).99.
+             10 SCTD-TOTAL     PIC Z(5).99.
            
+      *    Temporary data structure for Bubble sort
            05 TEMP-CART.
              10 FILLER    PIC X(3).
              10 FILLER    PIC 9(4).
@@ -179,18 +245,29 @@
              10 FILLER    PIC X(15).
              10 FILLER    PIC 9(5)V99.
              10 FILLER    PIC 9(5)V99.  
+
+      *    *************************************************************
+      *
+      *    Shopping Cart Report Data structures
+      *
+      *    *************************************************************
+
+      *    Shopping cart report data structure
+           05 SHOPPING-CART-REPORT-INDEX OCCURS 9999 TIMES
+               INDEXED BY SCR-IDX.
+             10 SCRI-CODE      PIC 9(4).
+             10 SCRI-PRODUCT   PIC X(35).
+             10 SCRI-PRICE     PIC 9(5)V99.
+             10 SCRI-QUANTITY  PIC 9(4).
+             10 SCRI-COST      PIC 9(5)V99.
            
-           05 SHOPPING-CART-DISPLAY.
-             10 SDC-MEMBER    PIC X(10).
-             10 SCD-CODE      PIC Z(4).
-             10 SCD-PRODUCT   PIC X(35).
-             10 SCD-PRICE     PIC Z(5).99.
-             10 SCD-QUANTITY  PIC Z(8).
-             10 SCD-METHOD    PIC X(15).
-             10 SCD-FEE       PIC Z(9).99.
-             10 SCD-COST      PIC Z(5).99.
-             10 SCD-TOTAL     PIC Z(5).99.
-      
+           05 SHOPPING-CART-REPORT-DISPLAY.
+             10 SCRD-CODE      PIC Z(4).
+             10 SCRD-PRODUCT   PIC X(35).
+             10 SCRD-PRICE     PIC Z(5).99.
+             10 SCRD-QUANTITY  PIC Z(8).
+             10 SCRD-COST      PIC Z(5).99.
+
       *    *************************************************************
       *
       *    Main body of code
@@ -202,18 +279,24 @@
            PERFORM BUILD-CATALOGUE-TABLE
       *    REQUIRED FUNCTION
 
-      *    PERFORM QUERY-USER-VERSION
-           PERFORM QUERY-NON-INTERACTIVE-VERSION
-
-      *    PERFORM BUILD-CATALOGUE-TABLE
-      *    PERFORM PROCESS-SHOPPING-CART
-      *    
-      *    PERFORM SORT-TABLE
-      *    PERFORM GENERATE-SHIPPING-REPORT
-      *    PERFORM DISPLAY-SHIPPING-REPORT
-      **    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
-      *    DISPLAY " "
-      *    DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
+           DISPLAY "IS THIS TO BE RUN INTERACTIVELY OR " 
+                   "NON-INTERACTIVELY? (Y/N): "
+                   WITH NO ADVANCING
+           ACCEPT WS-INTERACT-RESP
+           
+           EVALUATE TRUE
+            WHEN WS-INTERACT-RESP = "Y"
+              PERFORM QUERY-USER-VERSION
+            WHEN WS-INTERACT-RESP = "N"
+              PERFORM QUERY-NON-INTERACTIVE-VERSION
+            WHEN OTHER
+              DISPLAY "GOOD BYE."
+           END-EVALUATE.
+           
+      *    IF WS-INTERACT-RESP EQUAL "Y" THEN
+      *      PERFORM QUERY-USER-VERSION
+      *    END-IF
+      *    PERFORM QUERY-NON-INTERACTIVE-VERSION
 
            STOP RUN.
        
@@ -247,13 +330,20 @@
            PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
            DISPLAY " ... "
            PERFORM SORT-TABLE
-           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
-      *    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE.
+           PERFORM GENERATE-SHIPPING-REPORT
+           PERFORM DISPLAY-SHIPPING-REPORT
+      
            .
-       
+      
+      *    *************************************************************
+      *
+      *    Non-user interactive version of the code
+      *
+      *    ************************************************************* 
        QUERY-NON-INTERACTIVE-VERSION.
            PERFORM PROCESS-SHOPPING-CART
            
+           DISPLAY " "
            PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
            
            DISPLAY " "
@@ -264,6 +354,14 @@
 
            DISPLAY " "
            DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
+
+           PERFORM VARYING ERR-IDX FROM 1 BY 1 
+                                   UNTIL ERR-IDX EQUAL WS-ERRORS
+             DISPLAY "ERROR ON LINE: "
+                     EL-LINE(ERR-IDX)
+                     " ERROR: "
+                     EL-MESSAGE(ERR-IDX)
+           END-PERFORM
        .
       *    *************************************************************
       *
@@ -274,6 +372,7 @@
       *
       *    *************************************************************
 
+      *    Consolidate the non-indexed table
       *CONSOLIDATE-DATA-TO-TABLE.
       *    MOVE WS-MEMBER-RESP TO SCT-MEMBER(SCT-INDEX)
       *    MOVE WS-PRODUCT-CODE TO SCT-CODE(SCT-INDEX)
@@ -286,12 +385,14 @@
       *
       *    ADD 1 TO SCT-INDEX
       *    MOVE SCT-INDEX TO SCT-COUNT
+      **   Display a warning message at 9000 records
       *    IF SCT-INDEX EQUAL 9000 THEN
       *      DISPLAY "*** WARNING: " SCT-INDEX 
       *              " RECORDS OF " WS-MAX " ***"
       *    END-IF
       *.
 
+      *    Consolidate the indexed table
        CONSOLIDATE-DATA-TO-TABLE-INDEXED.
            MOVE WS-MEMBER-RESP TO SCTI-MEMBER(SCT-IDX)
            MOVE WS-PRODUCT-CODE TO SCTI-CODE(SCT-IDX) 
@@ -305,6 +406,7 @@
            SET SCT-IDX UP BY 1
            MOVE SCT-IDX TO SCT-IDXC
 
+      *    Display a warning message at 9000 records
            IF SCT-IDXC EQUAL 9000 THEN
              DISPLAY "*** WARNING: " SCT-IDXC 
                      " RECORDS OF " WS-MAX " ***"
@@ -316,7 +418,8 @@
       *    Display the consolidated data
       *
       *    *************************************************************
-
+      
+      *    Display the non-index table
       *DISPLAY-CONSOLIDATED-DATA-TABLE.
       *    MOVE 1 TO SCT-INDEX
       *
@@ -332,6 +435,7 @@
       *      ADD 1 TO SCT-INDEX
       *    END-PERFORM.
        
+      * Display the indexed table
        DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
            MOVE 0 TO WS-TOTAL-COST
            DISPLAY SCTH-MEMBER WS-GAP
@@ -345,31 +449,38 @@
 
            PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX 
                    EQUAL SCT-IDXC
-             MOVE SCTI-MEMBER(SCT-IDX) TO SDC-MEMBER
-             MOVE SCTI-CODE(SCT-IDX) TO SCD-CODE
-             MOVE SCTI-PRODUCT(SCT-IDX) TO SCD-PRODUCT
-             MOVE SCTI-PRICE(SCT-IDX) TO SCD-PRICE
-             MOVE SCTI-QUANTITY(SCT-IDX) TO SCD-QUANTITY
-             MOVE SCTI-METHOD(SCT-IDX) TO SCD-METHOD
-             MOVE SCTI-FEE(SCT-IDX) TO SCD-FEE
-             MOVE SCTI-COST(SCT-IDX) TO SCD-COST
+             MOVE SCTI-MEMBER(SCT-IDX)   TO SCTD-MEMBER
+             MOVE SCTI-CODE(SCT-IDX)     TO SCTD-CODE
+             MOVE SCTI-PRODUCT(SCT-IDX)  TO SCTD-PRODUCT
+             MOVE SCTI-PRICE(SCT-IDX)    TO SCTD-PRICE
+             MOVE SCTI-QUANTITY(SCT-IDX) TO SCTD-QUANTITY
+             MOVE SCTI-METHOD(SCT-IDX)   TO SCTD-METHOD
+             MOVE SCTI-FEE(SCT-IDX)      TO SCTD-FEE
+             MOVE SCTI-COST(SCT-IDX)     TO SCTD-COST
              COMPUTE WS-TOTAL-COST = WS-TOTAL-COST + SCTI-COST(SCT-IDX)
 
-             DISPLAY SDC-MEMBER WS-GAP
-                     SCD-CODE WS-GAP
-                     SCD-PRODUCT WS-GAP
-                     SCD-PRICE WS-GAP
-                     SCD-QUANTITY WS-GAP
-                     SCD-METHOD WS-GAP
-                     SCD-FEE WS-GAP
-                     SCD-COST
+             DISPLAY SCTD-MEMBER WS-GAP
+                     SCTD-CODE WS-GAP
+                     SCTD-PRODUCT WS-GAP
+                     SCTD-PRICE WS-GAP
+                     SCTD-QUANTITY WS-GAP
+                     SCTD-METHOD WS-GAP
+                     SCTD-FEE WS-GAP
+                     SCTD-COST
            END-PERFORM
            
            DISPLAY " "
-           MOVE WS-TOTAL-COST TO SCD-TOTAL
-           DISPLAY "TOTAL: $" SCD-TOTAL
+           MOVE WS-TOTAL-COST TO SCTD-TOTAL
+           DISPLAY "TOTAL: $" SCTD-TOTAL
            .
+      
+      *    *************************************************************
+      *
+      *    Generate the shipping and dispatch reports
+      *
+      *    *************************************************************
 
+      *    Generate the shipping report
        GENERATE-SHIPPING-REPORT.
            MOVE 1 TO SCR-IDXC
            MOVE "N" TO WS-FOUND
@@ -403,6 +514,7 @@
            END-PERFORM
        .
 
+      *    Original code, but modified by Copilot
        GENERATE-SHIPPING-REPORT-ORG.
            MOVE 1 TO SCR-IDXC
 
@@ -433,16 +545,29 @@
              END-IF
            END-PERFORM.
 
+      *    Display the shipping and dispatch report
        DISPLAY-SHIPPING-REPORT.
            SET SCR-IDX TO 1
 
+           DISPLAY SCTH-CODE WS-GAP
+                   SCTH-PRODUCT WS-GAP
+                   SCTH-PRICE WS-GAP
+                   SCTH-QUANTITY WS-GAP
+                   SCTH-COST
+
            PERFORM VARYING SCR-IDX FROM 1 BY 1 
                                            UNTIL SCR-IDX EQUAL SCR-IDXC
-             DISPLAY SCRI-CODE(SCR-IDX) WS-GAP
-                     SCRI-PRODUCT(SCR-IDX) WS-GAP
-                     SCRI-PRICE(SCR-IDX) WS-GAP
-                     SCRI-QUANTITY(SCR-IDX) WS-GAP
-                     SCRI-COST(SCR-IDX)
+             MOVE SCRI-CODE(SCR-IDX) TO SCRD-CODE
+             MOVE SCRI-PRODUCT(SCR-IDX) TO SCRD-PRODUCT
+             MOVE SCRI-PRICE(SCR-IDX) TO SCRD-PRICE
+             MOVE SCRI-QUANTITY(SCR-IDX) TO SCRD-QUANTITY
+             MOVE SCRI-COST(SCR-IDX) TO SCRD-COST
+
+             DISPLAY SCRD-CODE WS-GAP
+                     SCRD-PRODUCT WS-GAP
+                     SCRD-PRICE WS-GAP
+                     SCRD-QUANTITY WS-GAP
+                     SCRD-COST
            END-PERFORM
        .
       *    *************************************************************
@@ -481,6 +606,8 @@
        PROCESS-SHOPPING-CART.
            MOVE "N" TO WS-EOF01
            MOVE "Y" TO WS-SILENT
+           SET ERR-IDX TO 1
+
            OPEN INPUT CSV-SHOPPING-CART-FILE.
            PERFORM UNTIL WS-EOF01 EQUAL 'Y'
              READ CSV-SHOPPING-CART-FILE
@@ -531,8 +658,11 @@
       *          MOVE 'Y' TO WS-RESP-OK
                  IF WS-DISP-ERR EQUAL "Y" THEN
                    ADD 1 TO WS-ERRORS
-                   DISPLAY "FIX ENTRY ON LINE: " WS-CART-LINE WS-GAP
-                           "ERROR: " WS-DISP-MSG
+      *            DISPLAY "FIX ENTRY ON LINE: " WS-CART-LINE WS-GAP
+      *                    "ERROR: " WS-DISP-MSG
+                   MOVE WS-CART-LINE TO EL-LINE(ERR-IDX)
+                   MOVE WS-DISP-MSG TO EL-MESSAGE(ERR-IDX)
+                   SET ERR-IDX UP BY 1
                  END-IF
              END-READ
            END-PERFORM
@@ -649,6 +779,7 @@
            PERFORM VALIDATE-MEMBER
        .
 
+      *    Validate whether the reponse is valid or not
        VALIDATE-MEMBER.
            EVALUATE WS-MEMBER-RESP
              WHEN "YES"
@@ -702,7 +833,9 @@
              PERFORM SEARCH-PRODUCT-CODE
            END-IF
        .
-
+      
+      *    Ensure that the product code is between the ranges of
+      *    1 and 40
        VALIDATE-PRODUCT-CODE.
            EVALUATE TRUE
              WHEN WS-PRODUCT-NUM GREATER 0 AND WS-PRODUCT-NUM LESS 41
@@ -775,6 +908,7 @@
            PERFORM VALIDATE-QUANTITY
        .
 
+      *    Ensure that the quantity is between the ranges of 1 and 29
        VALIDATE-QUANTITY.
            EVALUATE TRUE
             WHEN WS-QUANT-NUM GREATER 0 AND LESS 30
@@ -819,19 +953,20 @@
        PROCESS-DELIVERY.
            MOVE 'N' TO WS-RESP-OK
            PERFORM VALIDATE-DELIVERY-METHOD
-           PERFORM PROCESS-DELIVERY-METHOD
+      *    PERFORM PROCESS-DELIVERY-METHOD
        .
 
+      *    Validate that the appropraite delivery method is chosen
        VALIDATE-DELIVERY-METHOD.
            EVALUATE WS-DELIVERY
       *      WHEN "DELIVERY"
              WHEN WS-DEL
                MOVE "Y" TO WS-RESP-OK
-               MOVE 1 TO WS-DELIVERY-NUM
+      *        MOVE 1 TO WS-DELIVERY-NUM
       *      WHEN "PICK-UP"
              WHEN WS-PU
                MOVE "Y" TO WS-RESP-OK
-               MOVE 2 TO WS-DELIVERY-NUM
+      *        MOVE 2 TO WS-DELIVERY-NUM
              WHEN OTHER
                IF WS-SILENT EQUAL "N" THEN
                  DISPLAY "INVALID DELIVERY METHOD. " 
@@ -839,6 +974,8 @@
                END-IF
            END-EVALUATE.
 
+      *    This is used to determine the what type of delivery method
+      *    was used for calculations
        PROCESS-DELIVERY-METHOD.
            MOVE 0 TO WS-DELIVERY-NUM
            IF WS-DELIVERY EQUAL WS-DEL THEN
@@ -853,10 +990,14 @@
       *
       *    *************************************************************
 
+      *    Calculate shipping fee based on what delivery method used,
+      *    quantity, and if the base rate is the only factor or if the 
+      *    base and subsequent item fee applies.
        CALCULATE-SHIP-FEE.
            MOVE 0 TO WS-SHIP-FEE
            
-           IF WS-DELIVERY-NUM EQUAL 1 THEN
+      *    IF WS-DELIVERY-NUM EQUAL 1 THEN
+           IF WS-DELIVERY EQUAL WS-DEL THEN
              IF WS-QUANT-NUM GREATER THAN 1 THEN
                COMPUTE WS-SHIP-FEE = 2.00 + 
                        (( WS-QUANT-NUM - 1 ) * 1.60)
@@ -865,6 +1006,9 @@
              END-IF
            END-IF.
 
+      *    Calculate the cost using the above shipping fee added to the
+      *    quantity multiplied by the price.  Then if the customer is a
+      *    member, apply a discount.
        CALCULATE-COST.
            MOVE 0 TO WS-COST
 
@@ -894,6 +1038,7 @@
            END-PERFORM
        .
 
+      *    Swap the records around using a temporary table.
        SWAP-RECORD.
            MOVE SHOPPING-CART-TABLE-INDEXED(I) TO TEMP-CART
            MOVE SHOPPING-CART-TABLE-INDEXED(J) TO
