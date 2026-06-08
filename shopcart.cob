@@ -67,6 +67,9 @@
        01  WS-COLS     PIC 9.
       *    Max table depth
        01  WS-MAX      PIC 9(4) VALUE 9999.
+      *    Underline dashes set to 40 characters long
+       01  WS-DASH     PIC X(40) VALUE 
+           "----------------------------------------".
       *    Variables for Bubble sort
        01  I           PIC 9(4) VALUE 0.
        01  J           PIC 9(4) VALUE 0.
@@ -138,7 +141,8 @@
       *    *************************************************************
        01  HOMEWARECITY-STORAGE.
       *    Manual indexing of the product table
-           05 HWC-INDEX  PIC 9(10).
+      *    05 HWC-INDEX  PIC 9(10).
+           05 HWC-IDXC   PIC 9(4).
       *    Manual calculation of the product code
            05 HWC-CODE   PIC 9(2).
       *    Shopping cart table index manual method
@@ -166,7 +170,8 @@
       *    *************************************************************
 
       *    Structure for Product catalogue table
-           05 PRODUCT-CATALOGUE-TABLE OCCURS 40 TIMES.
+           05 PRODUCT-CATALOGUE-TABLE OCCURS 40 TIMES
+                                      INDEXED BY HWC-IDX.
              10 PCT-CODE            PIC 9(4).
              10 PCT-PRODUCT         PIC X(35).
              10 PCT-PRICE           PIC 9(5)V99.
@@ -182,6 +187,9 @@
              10 PCH-CODE    PIC X(4)    VALUE "CODE".
              10 PCH-PROD    PIC X(35)   VALUE "PRODUCT NAME".
              10 PCH-PRICE   PIC X(8)    VALUE "$  PRICE".
+             10 PCH-CODE-U-LINE  PIC X(4).
+             10 PCH-PROD-U-LINE  PIC X(35).
+             10 PCH-PRICE-U-LINE PIC X(8).
            
       *    05 SHOPPING-CART-TABLE OCCURS 1000 TIMES.
       *      10 SCT-MEMBER    PIC X(3).
@@ -278,7 +286,7 @@
       *    REQUIRED FUNCTION
            PERFORM BUILD-CATALOGUE-TABLE
       *    REQUIRED FUNCTION
-
+           
            DISPLAY "IS THIS TO BE RUN INTERACTIVELY OR " 
                    "NON-INTERACTIVELY? (Y/N): "
                    WITH NO ADVANCING
@@ -291,12 +299,7 @@
               PERFORM QUERY-NON-INTERACTIVE-VERSION
             WHEN OTHER
               DISPLAY "GOOD BYE."
-           END-EVALUATE.
-           
-      *    IF WS-INTERACT-RESP EQUAL "Y" THEN
-      *      PERFORM QUERY-USER-VERSION
-      *    END-IF
-      *    PERFORM QUERY-NON-INTERACTIVE-VERSION
+           END-EVALUATE
 
            STOP RUN.
        
@@ -579,19 +582,23 @@
 
        BUILD-CATALOGUE-TABLE.
            OPEN INPUT CSV-PRODUCT-FILE.
-           MOVE 1 TO HWC-INDEX
+      *    MOVE 1 TO HWC-INDEX
+           SET HWC-IDX TO 1
            PERFORM UNTIL WS-EOF01 EQUAL 'Y'
              READ CSV-PRODUCT-FILE
                AT END MOVE 'Y' TO WS-EOF01
                NOT AT END
-                 MOVE HWC-INDEX TO HWC-CODE
-                 MOVE HWC-CODE TO PCT-CODE(HWC-INDEX)
+      *          MOVE HWC-INDEX TO HWC-CODE
+                 MOVE HWC-IDX TO HWC-IDXC
+                 MOVE HWC-IDXC TO HWC-CODE
+                 MOVE HWC-CODE TO PCT-CODE(HWC-IDX)
                  UNSTRING CSV-PRODUCT-RECORD
                    DELIMITED BY ','
                    INTO 
-                     PCT-PRODUCT(HWC-INDEX)
-                     PCT-PRICE(HWC-INDEX)
-                 ADD 1 TO HWC-INDEX
+                     PCT-PRODUCT(HWC-IDX)
+                     PCT-PRICE(HWC-IDX)
+      *          ADD 1 TO HWC-INDEX
+                 SET HWC-IDX UP BY 1
              END-READ         
            END-PERFORM.
            CLOSE CSV-PRODUCT-FILE
@@ -679,13 +686,16 @@
 
        DISPLAY-CATALOGUE.
            PERFORM DISPLAY-CATALOGUE-HEADERS
-           MOVE 1 TO HWC-INDEX
+      *    MOVE 1 TO HWC-INDEX
+           SET HWC-IDX TO 1
            MOVE 0 TO WS-COLS
 
-           PERFORM UNTIL HWC-INDEX IS GREATER THAN 40
-             MOVE PCT-CODE(HWC-INDEX) TO PCD-CODE
-             MOVE PCT-PRODUCT(HWC-INDEX) TO PCD-PRODUCT
-             MOVE PCT-PRICE(HWC-INDEX) TO PCD-PRICE
+      *    PERFORM UNTIL HWC-INDEX IS GREATER THAN 40
+           PERFORM VARYING HWC-IDX FROM 1 BY 1 
+                                   UNTIL HWC-IDX GREATER HWC-IDXC
+             MOVE PCT-CODE(HWC-IDX) TO PCD-CODE
+             MOVE PCT-PRODUCT(HWC-IDX) TO PCD-PRODUCT
+             MOVE PCT-PRICE(HWC-IDX) TO PCD-PRICE
              IF WS-COLS EQUAL 0 THEN
                DISPLAY PCD-CODE WS-GAP
                        PCD-PRODUCT WS-GAP
@@ -702,7 +712,7 @@
                MOVE 0 TO WS-COLS
              END-IF
 
-             ADD 1 TO HWC-INDEX
+      *      ADD 1 TO HWC-INDEX
            END-PERFORM.
 
       *    *************************************************************
@@ -730,18 +740,29 @@
            END-PERFORM
            MOVE 0 TO WS-COLS
            
+           MOVE WS-DASH TO PCH-CODE-U-LINE
+           MOVE WS-DASH TO PCH-PROD-U-LINE
+           MOVE WS-DASH TO PCH-PRICE-U-LINE
+
            PERFORM UNTIL WS-COLS EQUAL 2
              IF WS-COLS EQUAL 0 THEN
-               DISPLAY 
-                 "====" WS-GAP
-                 "===================================" WS-GAP
-                 "========" WS-GAP
-                 WITH NO ADVANCING 
+               DISPLAY PCH-CODE-U-LINE WS-GAP
+                       PCH-PROD-U-LINE WS-GAP
+                       PCH-PRICE-U-LINE WS-GAP
+                       WITH NO ADVANCING
+      *        DISPLAY 
+      *          "====" WS-GAP
+      *          "===================================" WS-GAP
+      *          "========" WS-GAP
+      *          WITH NO ADVANCING 
              ELSE
-               DISPLAY
-                 "====" WS-GAP
-                 "===================================" WS-GAP
-                 "========" WS-GAP
+               DISPLAY PCH-CODE-U-LINE WS-GAP
+                       PCH-PROD-U-LINE WS-GAP
+                       PCH-PRICE-U-LINE WS-GAP
+      *        DISPLAY
+      *          "====" WS-GAP
+      *          "===================================" WS-GAP
+      *          "========" WS-GAP
              END-IF
              ADD 1 TO WS-COLS
            END-PERFORM
@@ -857,19 +878,29 @@
       *    *************************************************************
 
        SEARCH-PRODUCT-CODE.
-           MOVE 1 TO HWC-INDEX
-           
-           PERFORM UNTIL HWC-INDEX GREATER 40
-             IF PCT-CODE(HWC-INDEX) EQUAL WS-PRODUCT-NUM THEN
-               MOVE PCT-CODE(HWC-INDEX) TO WS-PRODUCT-CODE
-               MOVE PCT-PRODUCT(HWC-INDEX) TO WS-PRODUCT-DESC
-               MOVE PCT-PRICE(HWC-INDEX) TO WS-PRODUCT-PRICE
-               EXIT PERFORM
-             ELSE
-               ADD 1 TO HWC-INDEX
-             END-IF
-           END-PERFORM
-           MOVE 1 TO HWC-INDEX.
+           SET HWC-IDX TO 1
+           SEARCH PRODUCT-CATALOGUE-TABLE
+             AT END
+               DISPLAY "ITEM NOT FOUND"
+             WHEN PCT-CODE(HWC-IDX) EQUAL WS-PRODUCT-NUM
+               MOVE PCT-CODE(HWC-IDX) TO WS-PRODUCT-CODE
+               MOVE PCT-PRODUCT(HWC-IDX) TO WS-PRODUCT-DESC
+               MOVE PCT-PRICE(HWC-IDX) TO WS-PRODUCT-PRICE
+           END-SEARCH
+      *    MOVE 1 TO HWC-INDEX
+      *    
+      *    PERFORM UNTIL HWC-INDEX GREATER 40
+      *      IF PCT-CODE(HWC-INDEX) EQUAL WS-PRODUCT-NUM THEN
+      *        MOVE PCT-CODE(HWC-INDEX) TO WS-PRODUCT-CODE
+      *        MOVE PCT-PRODUCT(HWC-INDEX) TO WS-PRODUCT-DESC
+      *        MOVE PCT-PRICE(HWC-INDEX) TO WS-PRODUCT-PRICE
+      *        EXIT PERFORM
+      *      ELSE
+      *        ADD 1 TO HWC-INDEX
+      *      END-IF
+      *    END-PERFORM
+      *    MOVE 1 TO HWC-INDEX
+           .
 
       *    *************************************************************
       *
