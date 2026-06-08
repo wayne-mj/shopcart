@@ -15,10 +15,6 @@
              ASSIGN TO "shop-cart.csv"
              ORGANIZATION IS LINE SEQUENTIAL.
 
-      *    SELECT CSV-PRODUCT-DB
-      *      ASSIGN TO "product.dat"
-      *      ORGANIZATION IS LINE SEQUENTIAL.
-
        DATA DIVISION.
       *    *************************************************************
       *
@@ -141,7 +137,6 @@
       *    *************************************************************
        01  HOMEWARECITY-STORAGE.
       *    Manual indexing of the product table
-      *    05 HWC-INDEX  PIC 9(10).
            05 HWC-IDXC   PIC 9(4).
       *    Manual calculation of the product code
            05 HWC-CODE   PIC 9(2).
@@ -191,16 +186,6 @@
              10 PCH-PROD-U-LINE  PIC X(35).
              10 PCH-PRICE-U-LINE PIC X(8).
            
-      *    05 SHOPPING-CART-TABLE OCCURS 1000 TIMES.
-      *      10 SCT-MEMBER    PIC X(3).
-      *      10 SCT-CODE      PIC 9(4).
-      *      10 SCT-PRODUCT   PIC X(35).
-      *      10 SCT-PRICE     PIC 9(5)V9(2).
-      *      10 SCT-QUANTITY  PIC 9(2).
-      *      10 SCT-METHOD    PIC X(15).
-      *      10 SCT-FEE       PIC 9(5)V99.
-      *      10 SCT-COST      PIC 9(5)V99.
-
       *    *************************************************************
       *
       *    Shopping Cart Table Data structures
@@ -230,6 +215,14 @@
              10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
              10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
              10 SCTH-COST      PIC X(8)     VALUE "$   COST".
+             10 SCTH-MEMBER-U    PIC X(10).
+             10 SCTH-CODE-U      PIC X(4).
+             10 SCTH-PRODUCT-U   PIC X(35).
+             10 SCTH-PRICE-U     PIC X(8).
+             10 SCTH-QUANTITY-U  PIC X(8).
+             10 SCTH-METHOD-U    PIC X(15).
+             10 SCTH-FEE-U       PIC X(12).
+             10 SCTH-COST-U      PIC X(8).
 
       *    Display data structure for shopping cart
            05 SHOPPING-CART-TABLE-DISPLAY.
@@ -375,26 +368,6 @@
       *
       *    *************************************************************
 
-      *    Consolidate the non-indexed table
-      *CONSOLIDATE-DATA-TO-TABLE.
-      *    MOVE WS-MEMBER-RESP TO SCT-MEMBER(SCT-INDEX)
-      *    MOVE WS-PRODUCT-CODE TO SCT-CODE(SCT-INDEX)
-      *    MOVE WS-PRODUCT-DESC TO SCT-PRODUCT(SCT-INDEX)
-      *    MOVE WS-PRODUCT-PRICE TO SCT-PRICE(SCT-INDEX)
-      *    MOVE WS-QUANT-NUM TO SCT-QUANTITY(SCT-INDEX)
-      *    MOVE WS-DELIVERY TO SCT-METHOD(SCT-INDEX)
-      *    MOVE WS-SHIP-FEE TO SCT-FEE(SCT-INDEX)
-      *    MOVE WS-COST TO SCT-COST(SCT-INDEX)
-      *
-      *    ADD 1 TO SCT-INDEX
-      *    MOVE SCT-INDEX TO SCT-COUNT
-      **   Display a warning message at 9000 records
-      *    IF SCT-INDEX EQUAL 9000 THEN
-      *      DISPLAY "*** WARNING: " SCT-INDEX 
-      *              " RECORDS OF " WS-MAX " ***"
-      *    END-IF
-      *.
-
       *    Consolidate the indexed table
        CONSOLIDATE-DATA-TO-TABLE-INDEXED.
            MOVE WS-MEMBER-RESP TO SCTI-MEMBER(SCT-IDX)
@@ -421,26 +394,17 @@
       *    Display the consolidated data
       *
       *    *************************************************************
-      
-      *    Display the non-index table
-      *DISPLAY-CONSOLIDATED-DATA-TABLE.
-      *    MOVE 1 TO SCT-INDEX
-      *
-      *    PERFORM UNTIL SCT-INDEX EQUAL SCT-COUNT
-      *      DISPLAY SCT-MEMBER(SCT-INDEX) WS-GAP
-      *              SCT-CODE(SCT-INDEX) WS-GAP
-      *              SCT-PRODUCT(SCT-INDEX) WS-GAP
-      *              SCT-PRICE(SCT-INDEX) WS-GAP
-      *              SCT-QUANTITY(SCT-INDEX) WS-GAP
-      *              SCT-METHOD(SCT-INDEX) WS-GAP
-      *              SCT-FEE(SCT-INDEX) WS-GAP
-      *              SCT-COST(SCT-INDEX)
-      *      ADD 1 TO SCT-INDEX
-      *    END-PERFORM.
        
-      * Display the indexed table
-       DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
-           MOVE 0 TO WS-TOTAL-COST
+       DISPLAY-SHOPPING-CART-HEADERS.
+           MOVE WS-DASH TO SCTH-MEMBER-U
+           MOVE WS-DASH TO SCTH-CODE-U
+           MOVE WS-DASH TO SCTH-PRODUCT-U
+           MOVE WS-DASH TO SCTH-PRICE-U
+           MOVE WS-DASH TO SCTH-QUANTITY-U
+           MOVE WS-DASH TO SCTH-METHOD-U
+           MOVE WS-DASH TO SCTH-FEE-U
+           MOVE WS-DASH TO SCTH-COST-U
+           
            DISPLAY SCTH-MEMBER WS-GAP
                      SCTH-CODE WS-GAP
                      SCTH-PRODUCT WS-GAP
@@ -449,6 +413,22 @@
                      SCTH-METHOD WS-GAP
                      SCTH-FEE WS-GAP
                      SCTH-COST
+
+           DISPLAY SCTH-MEMBER-U WS-GAP
+                     SCTH-CODE-U WS-GAP
+                     SCTH-PRODUCT-U WS-GAP
+                     SCTH-PRICE-U WS-GAP
+                     SCTH-QUANTITY-U WS-GAP
+                     SCTH-METHOD-U WS-GAP
+                     SCTH-FEE-U WS-GAP
+                     SCTH-COST-U
+       .
+
+      * Display the indexed table
+       DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
+           MOVE 0 TO WS-TOTAL-COST
+                
+           PERFORM DISPLAY-SHOPPING-CART-HEADERS
 
            PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX 
                    EQUAL SCT-IDXC
@@ -547,16 +527,35 @@
                ADD 1 TO SCR-IDXC
              END-IF
            END-PERFORM.
-
-      *    Display the shipping and dispatch report
-       DISPLAY-SHIPPING-REPORT.
-           SET SCR-IDX TO 1
-
+       
+       DISPLAY-SHIPPING-REPORT-HEADERS.
+           MOVE WS-DASH TO SCTH-MEMBER-U
+           MOVE WS-DASH TO SCTH-CODE-U
+           MOVE WS-DASH TO SCTH-PRODUCT-U
+           MOVE WS-DASH TO SCTH-PRICE-U
+           MOVE WS-DASH TO SCTH-QUANTITY-U
+           MOVE WS-DASH TO SCTH-METHOD-U
+           MOVE WS-DASH TO SCTH-FEE-U
+           MOVE WS-DASH TO SCTH-COST-U
+           
            DISPLAY SCTH-CODE WS-GAP
                    SCTH-PRODUCT WS-GAP
                    SCTH-PRICE WS-GAP
                    SCTH-QUANTITY WS-GAP
                    SCTH-COST
+
+           DISPLAY SCTH-CODE-U WS-GAP
+                   SCTH-PRODUCT-U WS-GAP
+                   SCTH-PRICE-U WS-GAP
+                   SCTH-QUANTITY-U WS-GAP
+                   SCTH-COST-U
+       .
+      
+      *    Display the shipping and dispatch report
+       DISPLAY-SHIPPING-REPORT.
+           SET SCR-IDX TO 1
+           
+           PERFORM DISPLAY-SHIPPING-REPORT-HEADERS
 
            PERFORM VARYING SCR-IDX FROM 1 BY 1 
                                            UNTIL SCR-IDX EQUAL SCR-IDXC
@@ -582,13 +581,11 @@
 
        BUILD-CATALOGUE-TABLE.
            OPEN INPUT CSV-PRODUCT-FILE.
-      *    MOVE 1 TO HWC-INDEX
            SET HWC-IDX TO 1
            PERFORM UNTIL WS-EOF01 EQUAL 'Y'
              READ CSV-PRODUCT-FILE
                AT END MOVE 'Y' TO WS-EOF01
                NOT AT END
-      *          MOVE HWC-INDEX TO HWC-CODE
                  MOVE HWC-IDX TO HWC-IDXC
                  MOVE HWC-IDXC TO HWC-CODE
                  MOVE HWC-CODE TO PCT-CODE(HWC-IDX)
@@ -597,7 +594,6 @@
                    INTO 
                      PCT-PRODUCT(HWC-IDX)
                      PCT-PRICE(HWC-IDX)
-      *          ADD 1 TO HWC-INDEX
                  SET HWC-IDX UP BY 1
              END-READ         
            END-PERFORM.
@@ -665,8 +661,6 @@
       *          MOVE 'Y' TO WS-RESP-OK
                  IF WS-DISP-ERR EQUAL "Y" THEN
                    ADD 1 TO WS-ERRORS
-      *            DISPLAY "FIX ENTRY ON LINE: " WS-CART-LINE WS-GAP
-      *                    "ERROR: " WS-DISP-MSG
                    MOVE WS-CART-LINE TO EL-LINE(ERR-IDX)
                    MOVE WS-DISP-MSG TO EL-MESSAGE(ERR-IDX)
                    SET ERR-IDX UP BY 1
@@ -686,11 +680,9 @@
 
        DISPLAY-CATALOGUE.
            PERFORM DISPLAY-CATALOGUE-HEADERS
-      *    MOVE 1 TO HWC-INDEX
            SET HWC-IDX TO 1
            MOVE 0 TO WS-COLS
 
-      *    PERFORM UNTIL HWC-INDEX IS GREATER THAN 40
            PERFORM VARYING HWC-IDX FROM 1 BY 1 
                                    UNTIL HWC-IDX GREATER HWC-IDXC
              MOVE PCT-CODE(HWC-IDX) TO PCD-CODE
@@ -712,7 +704,6 @@
                MOVE 0 TO WS-COLS
              END-IF
 
-      *      ADD 1 TO HWC-INDEX
            END-PERFORM.
 
       *    *************************************************************
@@ -750,19 +741,10 @@
                        PCH-PROD-U-LINE WS-GAP
                        PCH-PRICE-U-LINE WS-GAP
                        WITH NO ADVANCING
-      *        DISPLAY 
-      *          "====" WS-GAP
-      *          "===================================" WS-GAP
-      *          "========" WS-GAP
-      *          WITH NO ADVANCING 
              ELSE
                DISPLAY PCH-CODE-U-LINE WS-GAP
                        PCH-PROD-U-LINE WS-GAP
                        PCH-PRICE-U-LINE WS-GAP
-      *        DISPLAY
-      *          "====" WS-GAP
-      *          "===================================" WS-GAP
-      *          "========" WS-GAP
              END-IF
              ADD 1 TO WS-COLS
            END-PERFORM
@@ -887,19 +869,6 @@
                MOVE PCT-PRODUCT(HWC-IDX) TO WS-PRODUCT-DESC
                MOVE PCT-PRICE(HWC-IDX) TO WS-PRODUCT-PRICE
            END-SEARCH
-      *    MOVE 1 TO HWC-INDEX
-      *    
-      *    PERFORM UNTIL HWC-INDEX GREATER 40
-      *      IF PCT-CODE(HWC-INDEX) EQUAL WS-PRODUCT-NUM THEN
-      *        MOVE PCT-CODE(HWC-INDEX) TO WS-PRODUCT-CODE
-      *        MOVE PCT-PRODUCT(HWC-INDEX) TO WS-PRODUCT-DESC
-      *        MOVE PCT-PRICE(HWC-INDEX) TO WS-PRODUCT-PRICE
-      *        EXIT PERFORM
-      *      ELSE
-      *        ADD 1 TO HWC-INDEX
-      *      END-IF
-      *    END-PERFORM
-      *    MOVE 1 TO HWC-INDEX
            .
 
       *    *************************************************************
@@ -920,9 +889,6 @@
                ACCEPT WS-QUANT-RESP
                COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
                PERFORM VALIDATE-QUANTITY
-      *        IF WS-RESP-OK EQUAL 'Y' THEN
-      *          MOVE WS-QUANT-NUM TO SCT-QUANTITY
-      *        END-IF
            END-PERFORM.
       
       *    *************************************************************
@@ -968,9 +934,6 @@
              ACCEPT WS-DELIVERY
              PERFORM VALIDATE-DELIVERY-METHOD
              PERFORM PROCESS-DELIVERY-METHOD
-      *      IF WS-RESP-OK EQUAL "Y"
-      *        MOVE WS-DELIVERY TO SCT-METHOD
-      *      END-IF
            END-PERFORM
            MOVE "N" TO WS-RESP-OK.
        
@@ -990,14 +953,10 @@
       *    Validate that the appropraite delivery method is chosen
        VALIDATE-DELIVERY-METHOD.
            EVALUATE WS-DELIVERY
-      *      WHEN "DELIVERY"
              WHEN WS-DEL
                MOVE "Y" TO WS-RESP-OK
-      *        MOVE 1 TO WS-DELIVERY-NUM
-      *      WHEN "PICK-UP"
              WHEN WS-PU
                MOVE "Y" TO WS-RESP-OK
-      *        MOVE 2 TO WS-DELIVERY-NUM
              WHEN OTHER
                IF WS-SILENT EQUAL "N" THEN
                  DISPLAY "INVALID DELIVERY METHOD. " 
@@ -1027,7 +986,6 @@
        CALCULATE-SHIP-FEE.
            MOVE 0 TO WS-SHIP-FEE
            
-      *    IF WS-DELIVERY-NUM EQUAL 1 THEN
            IF WS-DELIVERY EQUAL WS-DEL THEN
              IF WS-QUANT-NUM GREATER THAN 1 THEN
                COMPUTE WS-SHIP-FEE = 2.00 + 
@@ -1058,9 +1016,7 @@
       *    *************************************************************
 
        SORT-TABLE.
-      *    PERFORM VARYING I FROM 1 BY 1 UNTIL I > SCT-IDXC - 1
            PERFORM VARYING I FROM 1 BY 1 UNTIL I EQUAL SCT-IDXC
-      *      PERFORM VARYING J FROM I BY 1 UNTIL J > SCT-IDXC - 1
              PERFORM VARYING J FROM I BY 1 UNTIL J EQUAL SCT-IDXC
                IF SCTI-CODE(I) > SCTI-CODE(J)
                  PERFORM SWAP-RECORD
