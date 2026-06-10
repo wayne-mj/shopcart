@@ -4,10 +4,10 @@ COBCFLAGS=-x -Wall -fixed
 #-Wextra
 COBCJOB=-jx
 PROJ=shopcart
-MUCK=muck
+# MUCK=muck
 SRC=$(PROJ).cob 
-MUCKSRC=$(MUCK).cob
-CLEANUP=muck shopcart product.dat
+# MUCKSRC=$(MUCK).cob
+CLEANUP=shopcart product.dat
 
 # Build everything LOUDLY
 all: clean $(PROJ)
@@ -25,9 +25,9 @@ $(PROJ): $(SRC)
 	$(COBC) $(COBCFLAGS) $(SRC)
 
 # Practice code to test ideas
-$(MUCK): $(MUCKSRC)
-# 	rm $(MUCK)
-	$(COBC) $(COBCFLAGS) $(MUCKSRC)
+# $(MUCK): $(MUCKSRC)
+# # 	rm $(MUCK)
+# 	$(COBC) $(COBCFLAGS) $(MUCKSRC)
 
 # Remove the executable
 clean:

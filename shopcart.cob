@@ -15,6 +15,10 @@
              ASSIGN TO "shop-cart.csv"
              ORGANIZATION IS LINE SEQUENTIAL.
 
+           SELECT SHOPCART-REPORT-FILE
+             ASSIGN TO "shopcart.dat"
+             ORGANIZATION IS LINE SEQUENTIAL.
+
        DATA DIVISION.
       *    *************************************************************
       *
@@ -32,7 +36,46 @@
        FD  CSV-SHOPPING-CART-FILE.
       * Each line should be no longer that 80 characters long
        01  CSV-SHOPPING-CART-RECORD PIC X(80).
-            
+
+       FD  SHOPCART-REPORT-FILE.
+       01  SHOPCART-HEADERS.
+           05 SCH-MEMBER    PIC X(10).
+           05 FILLER        PIC X(4).
+           05 SCH-CODE      PIC X(4).
+           05 FILLER        PIC X(4).
+           05 SCH-PRODUCT   PIC X(35).
+           05 FILLER        PIC X(4).
+           05 SCH-PRICE     PIC X(8).
+           05 FILLER        PIC X(4).
+           05 SCH-QUANTITY  PIC X(8).
+           05 FILLER        PIC X(4).
+           05 SCH-METHOD    PIC X(15).
+           05 FILLER        PIC X(4).
+           05 SCH-FEE       PIC X(12).
+           05 FILLER         PIC X(4).
+           05 SCH-COST      PIC X(8).
+
+       01  SHOPCART-REPORT.
+           05 SCR-MEMBER    PIC X(10).
+           05 FILLER        PIC X(4).
+           05 SCR-CODE      PIC Z(4).
+           05 FILLER        PIC X(4).
+           05 SCR-PRODUCT   PIC X(35).
+           05 FILLER        PIC X(4).
+           05 SCR-PRICE     PIC Z(5).99.
+           05 FILLER        PIC X(4).
+           05 SCR-QUANTITY  PIC Z(8).
+           05 FILLER        PIC X(4).
+           05 SCR-METHOD    PIC X(15).
+           05 FILLER        PIC X(4).
+           05 SCR-FEE       PIC Z(9).99.
+           05 FILLER        PIC X(4).
+           05 SCR-COST      PIC Z(5).99.
+           05 FILLER        PIC X(4).
+
+       01  SHOPCART-REPORT-TOTAL.
+           05 FILLER         PIC X(8) VALUE "TOTAL $ ".
+           05 SCR-TOTAL     PIC Z(5).99.
       *    *************************************************************
       *
       *    Working storage variables
@@ -148,6 +191,8 @@
            05 SCT-IDXC   PIC 9(4).
       *    Index counter for Shopping Cart Report
            05 SCR-IDXC   PIC 9(4).
+      *    Total for the Shopping Cart Table to be displayed
+      *    05 SCTD-TOTAL     PIC Z(5).99.
 
       *    *************************************************************
       *
@@ -206,34 +251,60 @@
              10 SCTI-COST      PIC 9(5)V99.
 
       *    Structure for headers for shopping cart
-           05 SHOPTING-CART-TABLE-HEADERS.
+           05 SHOPPING-CART-TABLE-HEADERS.
              10 SCTH-MEMBER    PIC X(10)    VALUE "MEMBER".
+             10 FILLER         PIC X(4).
              10 SCTH-CODE      PIC X(4)     VALUE "CODE".
+             10 FILLER         PIC X(4).
              10 SCTH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+             10 FILLER         PIC X(4).
              10 SCTH-PRICE     PIC X(8)     VALUE "$  PRICE".
+             10 FILLER         PIC X(4).
              10 SCTH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+             10 FILLER         PIC X(4).
              10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
+             10 FILLER         PIC X(4).
              10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
+             10 FILLER         PIC X(4).
              10 SCTH-COST      PIC X(8)     VALUE "$   COST".
+           
+           05 SHOPPING-CART-TABLE-U-LINE.
              10 SCTH-MEMBER-U    PIC X(10).
+             10 FILLER           PIC X(4).
              10 SCTH-CODE-U      PIC X(4).
+             10 FILLER           PIC X(4).
              10 SCTH-PRODUCT-U   PIC X(35).
+             10 FILLER           PIC X(4).
              10 SCTH-PRICE-U     PIC X(8).
+             10 FILLER           PIC X(4).
              10 SCTH-QUANTITY-U  PIC X(8).
+             10 FILLER           PIC X(4).
              10 SCTH-METHOD-U    PIC X(15).
+             10 FILLER           PIC X(4).
              10 SCTH-FEE-U       PIC X(12).
+             10 FILLER           PIC X(4).
              10 SCTH-COST-U      PIC X(8).
 
       *    Display data structure for shopping cart
            05 SHOPPING-CART-TABLE-DISPLAY.
              10 SCTD-MEMBER    PIC X(10).
+             10 FILLER        PIC X(4).
              10 SCTD-CODE      PIC Z(4).
+             10 FILLER        PIC X(4).
              10 SCTD-PRODUCT   PIC X(35).
+             10 FILLER        PIC X(4).
              10 SCTD-PRICE     PIC Z(5).99.
+             10 FILLER        PIC X(4).
              10 SCTD-QUANTITY  PIC Z(8).
+             10 FILLER        PIC X(4).
              10 SCTD-METHOD    PIC X(15).
+             10 FILLER        PIC X(4).
              10 SCTD-FEE       PIC Z(9).99.
+             10 FILLER        PIC X(4).
              10 SCTD-COST      PIC Z(5).99.
+           
+           05 SHOPPING-CART-TOTAL-DISPLAY.
+             10 FILLER         PIC X(8) VALUE "TOTAL $ ".
              10 SCTD-TOTAL     PIC Z(5).99.
            
       *    Temporary data structure for Bubble sort
@@ -341,6 +412,7 @@
            
            DISPLAY " "
            PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+           PERFORM WRITE-CONSOLIDATED-DATA
            
            DISPLAY " "
 
@@ -395,7 +467,7 @@
       *
       *    *************************************************************
        
-       DISPLAY-SHOPPING-CART-HEADERS.
+       SETUP-HEADERS.
            MOVE WS-DASH TO SCTH-MEMBER-U
            MOVE WS-DASH TO SCTH-CODE-U
            MOVE WS-DASH TO SCTH-PRODUCT-U
@@ -404,6 +476,18 @@
            MOVE WS-DASH TO SCTH-METHOD-U
            MOVE WS-DASH TO SCTH-FEE-U
            MOVE WS-DASH TO SCTH-COST-U
+       .
+
+       DISPLAY-SHOPPING-CART-HEADERS.
+      *    MOVE WS-DASH TO SCTH-MEMBER-U
+      *    MOVE WS-DASH TO SCTH-CODE-U
+      *    MOVE WS-DASH TO SCTH-PRODUCT-U
+      *    MOVE WS-DASH TO SCTH-PRICE-U
+      *    MOVE WS-DASH TO SCTH-QUANTITY-U
+      *    MOVE WS-DASH TO SCTH-METHOD-U
+      *    MOVE WS-DASH TO SCTH-FEE-U
+      *    MOVE WS-DASH TO SCTH-COST-U
+           PERFORM SETUP-HEADERS
            
            DISPLAY SCTH-MEMBER WS-GAP
                      SCTH-CODE WS-GAP
@@ -423,7 +507,7 @@
                      SCTH-FEE-U WS-GAP
                      SCTH-COST-U
        .
-
+       
       * Display the indexed table
        DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
            MOVE 0 TO WS-TOTAL-COST
@@ -456,7 +540,42 @@
            MOVE WS-TOTAL-COST TO SCTD-TOTAL
            DISPLAY "TOTAL: $" SCTD-TOTAL
            .
-      
+
+      *    *************************************************************
+      *
+      *    Write the shopping cart to a file
+      *
+      *    ************************************************************* 
+       WRITE-CONSOLIDATED-DATA.
+           MOVE 0 TO WS-TOTAL-COST
+           PERFORM SETUP-HEADERS
+
+           OPEN OUTPUT SHOPCART-REPORT-FILE
+             WRITE SHOPCART-HEADERS FROM SHOPPING-CART-TABLE-HEADERS
+             WRITE SHOPCART-HEADERS FROM SHOPPING-CART-TABLE-U-LINE
+             PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX
+                     EQUAL SCT-IDXC
+               MOVE SCTI-MEMBER(SCT-IDX)   TO SCTD-MEMBER
+               MOVE SCTI-CODE(SCT-IDX)     TO SCTD-CODE
+               MOVE SCTI-PRODUCT(SCT-IDX)  TO SCTD-PRODUCT
+               MOVE SCTI-PRICE(SCT-IDX)    TO SCTD-PRICE
+               MOVE SCTI-QUANTITY(SCT-IDX) TO SCTD-QUANTITY
+               MOVE SCTI-METHOD(SCT-IDX)   TO SCTD-METHOD
+               MOVE SCTI-FEE(SCT-IDX)      TO SCTD-FEE
+               MOVE SCTI-COST(SCT-IDX)     TO SCTD-COST
+               COMPUTE WS-TOTAL-COST = WS-TOTAL-COST + 
+                                       SCTI-COST(SCT-IDX)
+               
+               WRITE SHOPCART-REPORT FROM SHOPPING-CART-TABLE-DISPLAY
+             END-PERFORM
+             
+             MOVE WS-TOTAL-COST TO SCTD-TOTAL
+             WRITE SHOPCART-REPORT-TOTAL FROM 
+                   SHOPPING-CART-TOTAL-DISPLAY
+                   AFTER ADVANCING 1 LINE
+           CLOSE SHOPCART-REPORT-FILE
+
+       .
       *    *************************************************************
       *
       *    Generate the shipping and dispatch reports
@@ -528,7 +647,7 @@
              END-IF
            END-PERFORM.
        
-       DISPLAY-SHIPPING-REPORT-HEADERS.
+       SETUP-SHIPPING-HEADERS.
            MOVE WS-DASH TO SCTH-MEMBER-U
            MOVE WS-DASH TO SCTH-CODE-U
            MOVE WS-DASH TO SCTH-PRODUCT-U
@@ -537,6 +656,18 @@
            MOVE WS-DASH TO SCTH-METHOD-U
            MOVE WS-DASH TO SCTH-FEE-U
            MOVE WS-DASH TO SCTH-COST-U
+       .
+
+       DISPLAY-SHIPPING-REPORT-HEADERS.
+      *    MOVE WS-DASH TO SCTH-MEMBER-U
+      *    MOVE WS-DASH TO SCTH-CODE-U
+      *    MOVE WS-DASH TO SCTH-PRODUCT-U
+      *    MOVE WS-DASH TO SCTH-PRICE-U
+      *    MOVE WS-DASH TO SCTH-QUANTITY-U
+      *    MOVE WS-DASH TO SCTH-METHOD-U
+      *    MOVE WS-DASH TO SCTH-FEE-U
+      *    MOVE WS-DASH TO SCTH-COST-U
+           PERFORM SETUP-SHIPPING-HEADERS
            
            DISPLAY SCTH-CODE WS-GAP
                    SCTH-PRODUCT WS-GAP
@@ -782,7 +913,7 @@
            PERFORM VALIDATE-MEMBER
        .
 
-      *    Validate whether the reponse is valid or not
+      *    Validate whether the response is valid or not
        VALIDATE-MEMBER.
            EVALUATE WS-MEMBER-RESP
              WHEN "YES"
@@ -950,7 +1081,7 @@
       *    PERFORM PROCESS-DELIVERY-METHOD
        .
 
-      *    Validate that the appropraite delivery method is chosen
+      *    Validate that the appropriate delivery method is chosen
        VALIDATE-DELIVERY-METHOD.
            EVALUATE WS-DELIVERY
              WHEN WS-DEL
