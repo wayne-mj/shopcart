@@ -19,6 +19,10 @@
              ASSIGN TO "shopcart.dat"
              ORGANIZATION IS LINE SEQUENTIAL.
 
+           SELECT SHIP-REPORT-FILE
+             ASSIGN TO "shipping.dat"
+             ORGANIZATION IS LINE SEQUENTIAL.
+
        DATA DIVISION.
       *    *************************************************************
       *
@@ -76,6 +80,29 @@
        01  SHOPCART-REPORT-TOTAL.
            05 FILLER         PIC X(8) VALUE "TOTAL $ ".
            05 SCR-TOTAL     PIC Z(5).99.
+
+       FD  SHIP-REPORT-FILE.
+       01  SHIP-REPORT-HEADER.
+           05 SRH-CODE      PIC X(4).
+           05 FILLER        PIC X(4).
+           05 SRH-PRODUCT   PIC X(35).
+           05 FILLER        PIC X(4).
+           05 SRH-PRICE     PIC X(8).
+           05 FILLER        PIC X(4).
+           05 SRH-QUANTITY  PIC X(8).
+           05 FILLER        PIC X(4).
+           05 SRH-COST      PIC X(8).
+       
+       01  SHIP-REPORT-RECORD.
+           05 SRR-CODE      PIC X(4).
+           05 FILLER        PIC X(4).
+           05 SRR-PRODUCT   PIC X(35).
+           05 FILLER        PIC X(4).
+           05 SRR-PRICE     PIC X(8).
+           05 FILLER        PIC X(4).
+           05 SRR-QUANTITY  PIC X(8).
+           05 FILLER        PIC X(4).
+           05 SRR-COST      PIC X(8).
       *    *************************************************************
       *
       *    Working storage variables
@@ -288,19 +315,19 @@
       *    Display data structure for shopping cart
            05 SHOPPING-CART-TABLE-DISPLAY.
              10 SCTD-MEMBER    PIC X(10).
-             10 FILLER        PIC X(4).
+             10 FILLER         PIC X(4).
              10 SCTD-CODE      PIC Z(4).
-             10 FILLER        PIC X(4).
+             10 FILLER         PIC X(4).
              10 SCTD-PRODUCT   PIC X(35).
-             10 FILLER        PIC X(4).
+             10 FILLER         PIC X(4).
              10 SCTD-PRICE     PIC Z(5).99.
-             10 FILLER        PIC X(4).
+             10 FILLER         PIC X(4).
              10 SCTD-QUANTITY  PIC Z(8).
-             10 FILLER        PIC X(4).
+             10 FILLER         PIC X(4).
              10 SCTD-METHOD    PIC X(15).
-             10 FILLER        PIC X(4).
+             10 FILLER         PIC X(4).
              10 SCTD-FEE       PIC Z(9).99.
-             10 FILLER        PIC X(4).
+             10 FILLER         PIC X(4).
              10 SCTD-COST      PIC Z(5).99.
            
            05 SHOPPING-CART-TOTAL-DISPLAY.
@@ -335,10 +362,36 @@
            
            05 SHOPPING-CART-REPORT-DISPLAY.
              10 SCRD-CODE      PIC Z(4).
+             10 FILLER         PIC X(4).
              10 SCRD-PRODUCT   PIC X(35).
+             10 FILLER         PIC X(4).
              10 SCRD-PRICE     PIC Z(5).99.
+             10 FILLER         PIC X(4).
              10 SCRD-QUANTITY  PIC Z(8).
+             10 FILLER         PIC X(4).
              10 SCRD-COST      PIC Z(5).99.
+           
+           05 SHOPPING-CART-REPORT-HEADER.
+             10 SCRH-CODE      PIC X(4)     VALUE "CODE".
+             10 FILLER         PIC X(4).
+             10 SCRH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+             10 FILLER         PIC X(4).
+             10 SCRH-PRICE     PIC X(8)     VALUE "$  PRICE".
+             10 FILLER         PIC X(4).
+             10 SCRH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+             10 FILLER         PIC X(4).
+             10 SCRH-COST      PIC X(8)     VALUE "$   COST".
+
+           05 SHOPPING-CART-REPORT-U-LINE.
+             10 SCRH-CODE-U      PIC X(4).
+             10 FILLER           PIC X(4).
+             10 SCRH-PRODUCT-U   PIC X(35).
+             10 FILLER           PIC X(4).
+             10 SCRH-PRICE-U     PIC X(8).
+             10 FILLER           PIC X(4).
+             10 SCRH-QUANTITY-U  PIC X(8).
+             10 FILLER           PIC X(4).
+             10 SCRH-COST-U      PIC X(8).
 
       *    *************************************************************
       *
@@ -411,14 +464,15 @@
            PERFORM PROCESS-SHOPPING-CART
            
            DISPLAY " "
-           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+      *    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
            PERFORM WRITE-CONSOLIDATED-DATA
            
            DISPLAY " "
 
            PERFORM SORT-TABLE
            PERFORM GENERATE-SHIPPING-REPORT
-           PERFORM DISPLAY-SHIPPING-REPORT
+      *    PERFORM DISPLAY-SHIPPING-REPORT
+           PERFORM WRITE-SHIPPING-REPORT
 
            DISPLAY " "
            DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
@@ -656,6 +710,12 @@
            MOVE WS-DASH TO SCTH-METHOD-U
            MOVE WS-DASH TO SCTH-FEE-U
            MOVE WS-DASH TO SCTH-COST-U
+
+           MOVE WS-DASH TO SCRH-CODE-U
+           MOVE WS-DASH TO SCRH-PRODUCT-U
+           MOVE WS-DASH TO SCRH-PRICE-U
+           MOVE WS-DASH TO SCRH-QUANTITY-U
+           MOVE WS-DASH TO SCRH-COST-U
        .
 
        DISPLAY-SHIPPING-REPORT-HEADERS.
@@ -702,6 +762,29 @@
                      SCRD-QUANTITY WS-GAP
                      SCRD-COST
            END-PERFORM
+       .
+
+       WRITE-SHIPPING-REPORT.
+           SET SCR-IDX TO 1
+           PERFORM SETUP-SHIPPING-HEADERS
+
+           OPEN OUTPUT SHIP-REPORT-FILE.
+             WRITE SHIP-REPORT-HEADER FROM SHOPPING-CART-REPORT-HEADER
+             WRITE SHIP-REPORT-HEADER FROM SHOPPING-CART-REPORT-U-LINE
+
+             PERFORM VARYING SCR-IDX FROM 1 BY 1 
+                                           UNTIL SCR-IDX EQUAL SCR-IDXC
+               MOVE SCRI-CODE(SCR-IDX) TO SCRD-CODE
+               MOVE SCRI-PRODUCT(SCR-IDX) TO SCRD-PRODUCT
+               MOVE SCRI-PRICE(SCR-IDX) TO SCRD-PRICE
+               MOVE SCRI-QUANTITY(SCR-IDX) TO SCRD-QUANTITY
+               MOVE SCRI-COST(SCR-IDX) TO SCRD-COST
+
+               WRITE SHIP-REPORT-RECORD FROM 
+                     SHOPPING-CART-REPORT-DISPLAY
+               
+             END-PERFORM
+           CLOSE SHIP-REPORT-FILE
        .
       *    *************************************************************
       *
