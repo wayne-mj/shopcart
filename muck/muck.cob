@@ -1,0 +1,10 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MUCK.
+
+       DATA DIVISION.
+           
+       WORKING-STORAGE SECTION.
+
+       PROCEDURE DIVISION.
+
+           STOP RUN.  

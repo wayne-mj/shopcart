@@ -9,6 +9,10 @@
            SELECT CSV-PRODUCT-FILE 
              ASSIGN TO "../product.csv"
              ORGANIZATION IS LINE SEQUENTIAL.
+
+           SELECT PRODUCT-DB
+             ASSIGN TO "product.dat"
+             ORGANIZATION IS LINE SEQUENTIAL.
        
        DATA DIVISION.
        FILE SECTION.
@@ -16,6 +20,14 @@
        FD  CSV-PRODUCT-FILE.
       * Each line should be no longer that 80 characters long
        01 CSV-PRODUCT-RECORD PIC X(80).
+       
+       FD  PRODUCT-DB.
+       01  PRODUCT-DB-RECORD.
+           05 DB-CODE  PIC 9(4).
+           05 FILLER   PIC X(4).
+           05 DB-PROD  PIC X(35).
+           05 FILLER   PIC X(4).
+           05 DB-PRICE PIC Z(5).99.
        
        WORKING-STORAGE SECTION.
        01  PCT-IDXC          PIC 9(4).
@@ -41,7 +53,9 @@
 
            05 PRODUCT-CATALOGUE-DISPLAY.
              10 PCD-CODE     PIC Z(4).
+             10 FILLER       PIC X(4).
              10 PCD-PRODUCT  PIC X(35).
+             10 FILLER       PIC X(4).
              10 PCD-PRICE    PIC Z(4).99.
 
            05 SHOPPING-CART-TABLE-INDEX OCCURS 9999 TIMES
@@ -81,7 +95,7 @@
            DISPLAY "STARTING"
            PERFORM BUILD-CATALOGUE-TABLE
            PERFORM DISPLAY-CATALOGUE
-
+           PERFORM WRITE-PROD-DB
            MOVE 41 TO WS-SEARCH
 
            PERFORM SEARCH-CATALOGUE
@@ -168,3 +182,21 @@
                MOVE 0 TO WS-RET
            END-SEARCH
        .
+
+       WRITE-PROD-DB.
+           SET PCT-IDX TO 1
+           OPEN OUTPUT PRODUCT-DB.
+             
+             PERFORM VARYING PCT-IDX FROM 1 BY 1 UNTIL PCT-IDX
+                                                 GREATER PCT-IDXC
+               
+               MOVE PCT-CODE(PCT-IDX) TO PCD-CODE
+               MOVE PCT-PRODUCT(PCT-IDX) TO PCD-PRODUCT
+               MOVE PCT-PRICE(PCT-IDX) TO PCD-PRICE
+               WRITE PRODUCT-DB-RECORD FROM 
+                 PRODUCT-CATALOGUE-DISPLAY
+             END-PERFORM
+
+           CLOSE PRODUCT-DB
+       .
+

@@ -1,5 +1,4 @@
 .DS_Store
 shopcart
-muck
-product.dat
+*.dat
 product
