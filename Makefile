@@ -1,8 +1,10 @@
 COBC=cobc 
-COBCQUIET=-x -Wall
-COBCFLAGS=-x -Wall -fixed
+COBCQUIET=-Wall
+COBCFLAGS=-Wall -fixed -I copybooks
 #-Wextra
-COBCJOB=-jx
+COBCJOB=-jx $(COBCFLAGS)
+COBCBLD=-x $(COBCFLAGS)
+COBCBLQ=-x $(COBCQUIET)
 PROJ=shopcart
 # MUCK=muck
 SRC=$(PROJ).cob 
@@ -14,7 +16,7 @@ all: clean $(PROJ)
 
 # Build the code base, but only show basic warnings
 quiet: $(SRC)
-	$(COBC) $(COBCQUIET) $(SRC)
+	$(COBC) $(COBCBLQ) $(SRC)
 
 # Build and run the code
 run: clean $(SRC)
@@ -22,7 +24,7 @@ run: clean $(SRC)
 
 # Just build the code
 $(PROJ): $(SRC)
-	$(COBC) $(COBCFLAGS) $(SRC)
+	$(COBC) $(COBCBLD) $(SRC)
 
 # Practice code to test ideas
 # $(MUCK): $(MUCKSRC)
@@ -32,5 +34,5 @@ $(PROJ): $(SRC)
 # Remove the executable
 clean:
 	echo "Removing $(CLEANUP)"
-	rm -rf $(CLEANUP)
+	rm -rf $(CLEANUP) *.dat
 	

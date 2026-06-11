@@ -40,3 +40,14 @@ Rewriting some of the code has been a challenge as there are some aspects that j
 ## Comparing the development of Python and COBOL versions
 
 The Python version was more difficult to develop given the restraint that needed to be shown.  There was a wealth of libraries and functions available for use, but the scope of the course prevented access to these.  COBOL on the otherhand, because it was limited to begin with, did not suffer from this.  I knew going in that I had limits and these were set by the language itself.  I knew I had to write the all of the string handling routines from scratch, or at from a primitive to a more advance feature.  I was going to have to be creative about how I accomplished a task by breaking it down into smaller tasks to perform.
+
+## Alterations to the code
+
+The code has been updated to use copybooks for some sections to make the code easier to read and edit.  This was done to clean up some of the unused code, but to keep it intact at the same time.
+
+The entire code base has been written to operate unattended, and will produce three files:
+- shopcart.dat containing the shopping cart
+- shipping.dat which is the summary report for dispatch
+- error.dat which details the errors and what lines they appear on.
+
+This could be extended further to work with a database.

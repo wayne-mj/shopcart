@@ -23,6 +23,10 @@
              ASSIGN TO "shipping.dat"
              ORGANIZATION IS LINE SEQUENTIAL.
 
+           SELECT ERROR-REPORT-FILE
+             ASSIGN TO "error.dat"
+             ORGANIZATION IS LINE SEQUENTIAL.
+
        DATA DIVISION.
       *    *************************************************************
       *
@@ -103,6 +107,12 @@
            05 SRR-QUANTITY  PIC X(8).
            05 FILLER        PIC X(4).
            05 SRR-COST      PIC X(8).
+
+       FD  ERROR-REPORT-FILE.
+       01  ERROR-REPORT-RECORD.
+           05 ERR-MESSAGE  PIC X(80).
+           05 FILLER       PIC X(4).
+           05 ERR-LINE     PIC Z(9).
       *    *************************************************************
       *
       *    Working storage variables
@@ -115,10 +125,9 @@
       *    END OF FILE marker(s)
       *
       *    *************************************************************
-
        01  WS-EOF01    PIC X(1) VALUE 'N'.
        01  WS-EOF02    PIC X(1) VALUE 'N'.
-
+       COPY 'SORTWORK'.
       *    *************************************************************
       *
       *    Constants and other such shenanigans.
@@ -136,9 +145,6 @@
       *    Underline dashes set to 40 characters long
        01  WS-DASH     PIC X(40) VALUE 
            "----------------------------------------".
-      *    Variables for Bubble sort
-       01  I           PIC 9(4) VALUE 0.
-       01  J           PIC 9(4) VALUE 0.
 
       *    So I do not have to type over and over and over again
        01  WS-DELIVERY-METHODS.
@@ -229,7 +235,13 @@
            
            05 ERROR-LOG OCCURS 9999 TIMES INDEXED BY ERR-IDX.
              10 EL-MESSAGE          PIC X(80).
+             10 FILLER              PIC X(4).
              10 EL-LINE             PIC 9(7).
+           
+           05 ERROR-LOG-DISPLAY.
+             10 ERD-MESSAGE         PIC X(80).
+             10 FILLER              PIC X(4).
+             10 ERD-LINE            PIC Z(7).
       *    *************************************************************
       *
       *    Product Catalogue Table Data structures
@@ -404,19 +416,20 @@
            PERFORM BUILD-CATALOGUE-TABLE
       *    REQUIRED FUNCTION
            
-           DISPLAY "IS THIS TO BE RUN INTERACTIVELY OR " 
-                   "NON-INTERACTIVELY? (Y/N): "
-                   WITH NO ADVANCING
-           ACCEPT WS-INTERACT-RESP
-           
-           EVALUATE TRUE
-            WHEN WS-INTERACT-RESP = "Y"
-              PERFORM QUERY-USER-VERSION
-            WHEN WS-INTERACT-RESP = "N"
-              PERFORM QUERY-NON-INTERACTIVE-VERSION
-            WHEN OTHER
-              DISPLAY "GOOD BYE."
-           END-EVALUATE
+           PERFORM QUERY-WRITE-DATASETS
+      *    DISPLAY "IS THIS TO BE RUN INTERACTIVELY OR " 
+      *            "NON-INTERACTIVELY? (Y/N): "
+      *            WITH NO ADVANCING
+      *    ACCEPT WS-INTERACT-RESP
+      *    
+      *    EVALUATE TRUE
+      *     WHEN WS-INTERACT-RESP = "Y"
+      *       PERFORM QUERY-USER-VERSION
+      *     WHEN WS-INTERACT-RESP = "N"
+      *       PERFORM QUERY-NON-INTERACTIVE-VERSION
+      *     WHEN OTHER
+      *       DISPLAY "GOOD BYE."
+      *    END-EVALUATE
 
            STOP RUN.
        
@@ -464,15 +477,15 @@
            PERFORM PROCESS-SHOPPING-CART
            
            DISPLAY " "
-      *    PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
-           PERFORM WRITE-CONSOLIDATED-DATA
+           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+      *    PERFORM WRITE-CONSOLIDATED-DATA
            
            DISPLAY " "
 
            PERFORM SORT-TABLE
            PERFORM GENERATE-SHIPPING-REPORT
-      *    PERFORM DISPLAY-SHIPPING-REPORT
-           PERFORM WRITE-SHIPPING-REPORT
+           PERFORM DISPLAY-SHIPPING-REPORT
+      *    PERFORM WRITE-SHIPPING-REPORT
 
            DISPLAY " "
            DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
@@ -484,6 +497,29 @@
                      " ERROR: "
                      EL-MESSAGE(ERR-IDX)
            END-PERFORM
+       .
+
+       WRITE-ERROR-REPORT.
+           OPEN OUTPUT ERROR-REPORT-FILE.
+
+             PERFORM VARYING ERR-IDX FROM 1 BY 1
+             UNTIL ERR-IDX EQUAL WS-ERRORS
+               MOVE EL-LINE(ERR-IDX) TO ERD-LINE
+               MOVE EL-MESSAGE(ERR-IDX) TO ERD-MESSAGE
+
+               WRITE ERROR-REPORT-RECORD FROM ERROR-LOG-DISPLAY
+             END-PERFORM
+
+           CLOSE ERROR-REPORT-FILE
+       .
+
+       QUERY-WRITE-DATASETS.
+           PERFORM PROCESS-SHOPPING-CART
+           PERFORM WRITE-CONSOLIDATED-DATA
+           PERFORM SORT-TABLE
+           PERFORM GENERATE-SHIPPING-REPORT
+           PERFORM WRITE-SHIPPING-REPORT
+           PERFORM WRITE-ERROR-REPORT
        .
       *    *************************************************************
       *
@@ -963,231 +999,15 @@
              ADD 1 TO WS-COLS
            END-PERFORM
            MOVE 0 TO WS-COLS.
+            
+       COPY "MEMBER".
 
-      *    *************************************************************
-      *
-      *    Functions and methods to query if the customer is a member
-      *    and to validate the response from the user
-      *
-      *    *************************************************************       
-
-       QUERY-IS-MEMBER.
-           MOVE SPACE TO WS-MEMBER-RESP
-           MOVE "N" TO WS-RESP-OK
-           
-           PERFORM UNTIL WS-RESP-OK = 'Y'
-             DISPLAY "IS THE CUSTOMER A MEMBER? (YES/NO/END): "
-               WITH NO ADVANCING
-             ACCEPT WS-MEMBER-RESP
-             PERFORM VALIDATE-MEMBER
-           END-PERFORM
-           MOVE "N" TO WS-RESP-OK.
+       COPY "PCODE".
       
-      *    *************************************************************
-      *
-      *    Validate that the entered response is correct and notify the
-      *    user with a response if it is not
-      *
-      *    *************************************************************
+       COPY "QUANTITY".
 
-       PROCESS-IS-MEMBER.
-           MOVE 'N' TO WS-RESP-OK
-           
-           PERFORM VALIDATE-MEMBER
-       .
-
-      *    Validate whether the response is valid or not
-       VALIDATE-MEMBER.
-           EVALUATE WS-MEMBER-RESP
-             WHEN "YES"
-               MOVE 'Y' TO WS-RESP-OK
-             WHEN "NO"
-               MOVE 'Y' TO WS-RESP-OK
-             WHEN "END"
-               MOVE 'Y' TO WS-RESP-OK
-             WHEN OTHER
-               MOVE 'N' TO WS-RESP-OK
-               IF WS-SILENT EQUAL "N"
-                 DISPLAY "INVALID INPUT: 'YES/NO/END' ONLY."
-               END-IF
-           END-EVALUATE.
+       COPY "DELIVERY".
       
-      *    *************************************************************
-      *
-      *    Functions and methods to query to query the product code
-      *    and to validate the response from the user
-      *
-      *    *************************************************************   
-
-       QUERY-PRODUCT-CODE.
-           MOVE 'N' TO WS-RESP-OK
-           MOVE 0 TO WS-PRODUCT-NUM
-           MOVE SPACES TO WS-PRODUCT-RESP
-
-           PERFORM UNTIL WS-RESP-OK EQUAL 'Y'
-             DISPLAY "SELECT A PRODUCT (1-40): "
-               WITH NO ADVANCING
-             ACCEPT WS-PRODUCT-RESP
-             COMPUTE WS-PRODUCT-NUM = FUNCTION NUMVAL (WS-PRODUCT-RESP)
-             PERFORM VALIDATE-PRODUCT-CODE       
-           END-PERFORM
-           MOVE "N" TO WS-RESP-OK
-           MOVE SPACES TO WS-PRODUCT-RESP.
-
-      *    *************************************************************
-      *
-      *    Validate the product code entered is within the predefined
-      *    range, otherwise notify the user with an appropriate message
-      *
-      *    *************************************************************
-
-       PROCESS-PRODUCT-CODE.
-           MOVE 'N' TO WS-RESP-OK
-           
-           COMPUTE WS-PRODUCT-NUM = FUNCTION NUMVAL(WS-PRODUCT-RESP)
-           PERFORM VALIDATE-PRODUCT-CODE
-           IF WS-RESP-OK EQUAL "Y" THEN
-             PERFORM SEARCH-PRODUCT-CODE
-           END-IF
-       .
-      
-      *    Ensure that the product code is between the ranges of
-      *    1 and 40
-       VALIDATE-PRODUCT-CODE.
-           EVALUATE TRUE
-             WHEN WS-PRODUCT-NUM GREATER 0 AND WS-PRODUCT-NUM LESS 41
-               MOVE "Y" TO WS-RESP-OK
-             WHEN OTHER
-               MOVE "N" TO WS-RESP-OK
-               IF WS-SILENT EQUAL 'N'
-                DISPLAY "INVALID INPUT: '1-40' ONLY."
-               END-IF
-           END-EVALUATE.
-
-      *    *************************************************************
-      *
-      *    Execute the search of the table for the desired product.
-      *    COBOL has a dedicated SEARCH function, but as the table is 
-      *    not using an actual INDEX which would require the use of SET
-      *    rather than MOVE/ADD PERFORM loops are used instead.
-      *
-      *    *************************************************************
-
-       SEARCH-PRODUCT-CODE.
-           SET HWC-IDX TO 1
-           SEARCH PRODUCT-CATALOGUE-TABLE
-             AT END
-               DISPLAY "ITEM NOT FOUND"
-             WHEN PCT-CODE(HWC-IDX) EQUAL WS-PRODUCT-NUM
-               MOVE PCT-CODE(HWC-IDX) TO WS-PRODUCT-CODE
-               MOVE PCT-PRODUCT(HWC-IDX) TO WS-PRODUCT-DESC
-               MOVE PCT-PRICE(HWC-IDX) TO WS-PRODUCT-PRICE
-           END-SEARCH
-           .
-
-      *    *************************************************************
-      *
-      *    Functions and methods to query to query the quantity
-      *    and to validate the response from the user
-      *
-      *    *************************************************************
-
-       QUERY-QUANTITY.
-           MOVE 'N' TO WS-RESP-OK
-           MOVE SPACES TO WS-QUANT-RESP
-           MOVE 0 TO WS-QUANT-NUM
-
-           PERFORM UNTIL WS-RESP-OK EQUAL 'Y'
-             DISPLAY "HOW MANY ITEMS TO DISPLAY? (1-29): "
-               WITH NO ADVANCING
-               ACCEPT WS-QUANT-RESP
-               COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
-               PERFORM VALIDATE-QUANTITY
-           END-PERFORM.
-      
-      *    *************************************************************
-      *
-      *    Validate that the quantity entered is within the predefined
-      *    range, and if it is not notify the user
-      *
-      *    *************************************************************
-
-       PROCESS-QUANTITY.
-           MOVE 'N' TO WS-RESP-OK
-           
-           COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
-           PERFORM VALIDATE-QUANTITY
-       .
-
-      *    Ensure that the quantity is between the ranges of 1 and 29
-       VALIDATE-QUANTITY.
-           EVALUATE TRUE
-            WHEN WS-QUANT-NUM GREATER 0 AND LESS 30
-              MOVE 'Y' TO WS-RESP-OK
-            WHEN OTHER
-              MOVE "N" TO WS-RESP-OK
-              IF WS-SILENT EQUAL 'N' THEN
-                DISPLAY "INVALID QUANTITY BETWEEN 1 AND 29 INCLUSIVELY."
-              END-IF
-           END-EVALUATE.
-
-      *    *************************************************************
-      *
-      *    Functions and methods to query to query the delivery method
-      *    and to validate the response from the user
-      *
-      *    *************************************************************
-
-       QUERY-DELIVERY-METHOD.
-           MOVE "N" TO WS-RESP-OK
-           MOVE SPACES TO WS-DELIVERY
-
-           PERFORM UNTIL WS-RESP-OK EQUAL "Y"
-             DISPLAY "DELIVERY METHOD? (DELIVERY/PICK-UP): "
-               WITH NO ADVANCING
-             ACCEPT WS-DELIVERY
-             PERFORM VALIDATE-DELIVERY-METHOD
-             PERFORM PROCESS-DELIVERY-METHOD
-           END-PERFORM
-           MOVE "N" TO WS-RESP-OK.
-       
-      *    *************************************************************
-      *
-      *    Validate the delivery methods that the user has entered,
-      *    if they have entered in an invalid choice, notify them
-      *
-      *    *************************************************************
-
-       PROCESS-DELIVERY.
-           MOVE 'N' TO WS-RESP-OK
-           PERFORM VALIDATE-DELIVERY-METHOD
-      *    PERFORM PROCESS-DELIVERY-METHOD
-       .
-
-      *    Validate that the appropriate delivery method is chosen
-       VALIDATE-DELIVERY-METHOD.
-           EVALUATE WS-DELIVERY
-             WHEN WS-DEL
-               MOVE "Y" TO WS-RESP-OK
-             WHEN WS-PU
-               MOVE "Y" TO WS-RESP-OK
-             WHEN OTHER
-               IF WS-SILENT EQUAL "N" THEN
-                 DISPLAY "INVALID DELIVERY METHOD. " 
-                         "CHOOSE 'DELIVERY' OR 'PICK-UP'."
-               END-IF
-           END-EVALUATE.
-
-      *    This is used to determine the what type of delivery method
-      *    was used for calculations
-       PROCESS-DELIVERY-METHOD.
-           MOVE 0 TO WS-DELIVERY-NUM
-           IF WS-DELIVERY EQUAL WS-DEL THEN
-             MOVE 1 TO WS-DELIVERY-NUM
-           IF WS-DELIVERY EQUAL WS-PU THEN
-             MOVE 2 TO WS-DELIVERY-NUM
-           END-IF.
-
       *    *************************************************************
       *
       *    Functions and methods to calculate shipping and costs
@@ -1221,59 +1041,12 @@
            IF WS-MEMBER-RESP EQUAL "YES" THEN
              COMPUTE WS-COST = WS-COST * (90 / 100)
            END-IF.
+       
+       COPY "SORTCODE".
+             
+       COPY "CPSORT".
 
-      *    *************************************************************
-      *
-      *    Functions and methods to perform Bubble sort
-      *    This is based loosely on the W3 School Python version
-      *
-      *    *************************************************************
-
-       SORT-TABLE.
-           PERFORM VARYING I FROM 1 BY 1 UNTIL I EQUAL SCT-IDXC
-             PERFORM VARYING J FROM I BY 1 UNTIL J EQUAL SCT-IDXC
-               IF SCTI-CODE(I) > SCTI-CODE(J)
-                 PERFORM SWAP-RECORD
-               END-IF
-             END-PERFORM
-           END-PERFORM
-       .
-
-      *    Swap the records around using a temporary table.
-       SWAP-RECORD.
-           MOVE SHOPPING-CART-TABLE-INDEXED(I) TO TEMP-CART
-           MOVE SHOPPING-CART-TABLE-INDEXED(J) TO
-                SHOPPING-CART-TABLE-INDEXED(I)
-           MOVE TEMP-CART TO SHOPPING-CART-TABLE-INDEXED(J)
-       .
-
-      *    *************************************************************
-      *    
-      *    I asked Copilot for help as I was losing the first record.
-      *    I did not realise I was iterating beyond the indexed bounds
-      *    which meant that 0 was possible and this was being added to
-      *    to the table.  Copilot also suggested a fix to stop self 
-      *    referencing the first element and this is what it came up 
-      *    with.  I kept it separate from my code as it is not my work.
-      *
-      *    *************************************************************
-
-       COPILOT-SORT-TABLE.
-           PERFORM VARYING I FROM 1 BY 1 UNTIL I >= SCT-IDXC - 1
-             PERFORM VARYING J FROM 1 BY 1 UNTIL J >= SCT-IDXC - I
-               IF SCTI-CODE(J) > SCTI-CODE(J + 1)
-                 PERFORM COPILOT-SWAP-RECORD
-               END-IF
-             END-PERFORM
-           END-PERFORM
-       .
-
-       COPILOT-SWAP-RECORD.
-           MOVE SHOPPING-CART-TABLE-INDEXED(J) TO TEMP-CART
-           MOVE SHOPPING-CART-TABLE-INDEXED(J + 1) TO
-                SHOPPING-CART-TABLE-INDEXED(J)
-           MOVE TEMP-CART TO SHOPPING-CART-TABLE-INDEXED(J + 1)
-       .
+      
        
 
        
