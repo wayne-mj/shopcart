@@ -1,50 +1,51 @@
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. SHOP-CART.
-       AUTHOR "Wayne Jackson".
-       
+       PROGRAM-ID. PRODUCT.
+       AUTHOR WAYNE.
+
        ENVIRONMENT DIVISION.
        INPUT-OUTPUT SECTION.
-      * Define the file name and set it as a sequential file with each
-      * line being beneath the previous.
+      *    Define the file name and set it as a sequential file with each
+      *    line being beneath the previous.
        FILE-CONTROL.
-           SELECT CSV-PRODUCT-FILE 
-             ASSIGN TO "product.csv"
-             ORGANIZATION IS LINE SEQUENTIAL.
-
-           SELECT CSV-SHOPPING-CART-FILE
-             ASSIGN TO "shop-cart.csv"
-             ORGANIZATION IS LINE SEQUENTIAL.
-
-           SELECT SHOPCART-REPORT-FILE
-             ASSIGN TO "shopcart.dat"
-             ORGANIZATION IS LINE SEQUENTIAL.
-
-           SELECT SHIP-REPORT-FILE
-             ASSIGN TO "shipping.dat"
-             ORGANIZATION IS LINE SEQUENTIAL.
-
-           SELECT ERROR-REPORT-FILE
-             ASSIGN TO "error.dat"
-             ORGANIZATION IS LINE SEQUENTIAL.
+      *    File access for product and price list
+       SELECT CSV-PRODUCT-FILE 
+           ASSIGN TO "product.csv"
+           ORGANIZATION IS LINE SEQUENTIAL.
+      *    File access for shopping cart orders
+       SELECT CSV-SHOPPING-CART-FILE
+           ASSIGN TO "shop-cart.csv"
+           ORGANIZATION IS LINE SEQUENTIAL.
+      *    File access for shopping cart orders
+       SELECT SHOPCART-REPORT-FILE
+           ASSIGN TO "shopcart.dat"
+           ORGANIZATION IS LINE SEQUENTIAL.
+      *    File access for shipping report
+       SELECT SHIP-REPORT-FILE
+           ASSIGN TO "shipping.dat"
+           ORGANIZATION IS LINE SEQUENTIAL.
+      *    File access for error report
+       SELECT ERROR-REPORT-FILE
+           ASSIGN TO "error.dat"
+           ORGANIZATION IS LINE SEQUENTIAL.
 
        DATA DIVISION.
-      *    *************************************************************
-      *
-      *    Variables and other related items for files
-      *
-      *    *************************************************************
-
        FILE SECTION.
-      * File descriptor for CSV file
+      *    File descriptor for product and price list
        FD  CSV-PRODUCT-FILE.
-      * Each line should be no longer that 80 characters long
-       01 CSV-PRODUCT-RECORD PIC X(80).
-       
-      * File descriptor for shop order CSV file
-       FD  CSV-SHOPPING-CART-FILE.
-      * Each line should be no longer that 80 characters long
-       01  CSV-SHOPPING-CART-RECORD PIC X(80).
+      *    While it is know to be a comma separated string, the actual
+      *    format of the file is not really known as such.
+       01  CSV-PROD-RECORD PIC X(80).
 
+      *    File descriptor for shopping cart order file
+       FD  CSV-SHOPPING-CART-FILE.
+      *    There are four fields, member, product code, quantity, and
+      *    delivery method; but as these are of unknown length each time
+      *    for a comma separated string it is easier to allocate a large
+      *    buffer.
+       01  CSV-SHOPPING-CART-RECORD PIC X(80).
+       
+      *    Shopping cart order file descriptor and associated record
+      *    formats
        FD  SHOPCART-REPORT-FILE.
        01  SHOPCART-HEADERS.
            05 SCH-MEMBER    PIC X(10).
@@ -85,6 +86,8 @@
            05 FILLER         PIC X(8) VALUE "TOTAL $ ".
            05 SCR-TOTAL     PIC Z(5).99.
 
+      *    Shipping report file descriptor and associated record
+      *    formats
        FD  SHIP-REPORT-FILE.
        01  SHIP-REPORT-HEADER.
            05 SRH-CODE      PIC X(4).
@@ -98,113 +101,83 @@
            05 SRH-COST      PIC X(8).
        
        01  SHIP-REPORT-RECORD.
-           05 SRR-CODE      PIC X(4).
+           05 SRR-CODE      PIC Z(4).
            05 FILLER        PIC X(4).
            05 SRR-PRODUCT   PIC X(35).
            05 FILLER        PIC X(4).
-           05 SRR-PRICE     PIC X(8).
+           05 SRR-PRICE     PIC Z(5).99.
            05 FILLER        PIC X(4).
-           05 SRR-QUANTITY  PIC X(8).
+           05 SRR-QUANTITY  PIC Z(8).
            05 FILLER        PIC X(4).
-           05 SRR-COST      PIC X(8).
+           05 SRR-COST      PIC Z(5).99.
 
+      *    File descriptor for the error report with associated data
+      *    records
        FD  ERROR-REPORT-FILE.
        01  ERROR-REPORT-RECORD.
-           05 ERR-MESSAGE  PIC X(80).
+           05 ERR-MESSAGE  PIC X(20).
            05 FILLER       PIC X(4).
-           05 ERR-LINE     PIC Z(9).
-      *    *************************************************************
-      *
-      *    Working storage variables
-      *
-      *    ************************************************************* 
+           05 ERR-LINE     PIC Z(7).
 
        WORKING-STORAGE SECTION.
-      *    *************************************************************
-      *
-      *    END OF FILE marker(s)
-      *
-      *    *************************************************************
-       01  WS-EOF01    PIC X(1) VALUE 'N'.
-       01  WS-EOF02    PIC X(1) VALUE 'N'.
-       COPY 'SORTWORK'.
-      *    *************************************************************
-      *
-      *    Constants and other such shenanigans.
-      *
-      *    *************************************************************
-           
-      *    Gap between headers and columns
-       01  WS-GAP      PIC X(4) VALUE SPACES.
-      *    Debug gap to check if the gap is looking right
-      *01  WS-GAP      PIC X(4) VALUE "....".
-      *    Variable to track the columns
-       01  WS-COLS     PIC 9.
-      *    Max table depth
-       01  WS-MAX      PIC 9(4) VALUE 9999.
-      *    Underline dashes set to 40 characters long
+      *    Conditional values for for headers for reports
+       01  WS-HEADERS  PIC X.
+           88 SHOP-CART VALUE "C".
+           88 SHIP-REP  VALUE "S".
+
+      *    End of file marker
+       01  WS-EOF01  PIC X(1)  VALUE "N".
+      *    Gap between title and decorators
+       01  WS-GAP    PIC X(4)  VALUE SPACES.
+      *    Maximum number of records
+       01  WS-MAX    PIC 9999 VALUE 9999.
+      *    Tracking the number of columns
+       01  WS-COLS   PIC 9.
+      *    The decorator constant
        01  WS-DASH     PIC X(40) VALUE 
            "----------------------------------------".
+      *    Title or Underline state
+       01  WS-TORU   PIC X(1)  VALUE "N".
+      *    Token to signify if the response if valid or not
+       01  WS-RESP-OK PIC X(1) VALUE "N".
+      *    Lines of the shopping cart order
+       01  WS-CART-LINES  PIC 9(4)  VALUE 0.
+      *    What type of error has occurred
+       01  WS-DISP-MSG    PIC X(15).
+      *    Notify of the error
+       01  WS-DISP-ERR    PIC X VALUE "N".
+      *    Variables required for Bubble Sort
+       01  I            PIC 9(4) VALUE 0.
+       01  J            PIC 9(4) VALUE 0.
 
-      *    So I do not have to type over and over and over again
-       01  WS-DELIVERY-METHODS.
-           05 WS-DEL   PIC X(8) VALUE "DELIVERY".
-           05 WS-PU    PIC X(7) VALUE "PICK-UP".
-
-      *    *************************************************************
-      *    
-      *    Required variables
-      *
-      *    *************************************************************
-       01  WS-REQUIRED-VARIABLES.
-      *    Used to track what line errors occurred in the source cart
-           05 WS-CART-LINE      PIC 9(7)    VALUE 0.
-      *    Boolean variable to track if to display an error message
-           05 WS-DISP-ERR       PIC X(1)    VALUE "N".
-      *    Buffer for the error message
-           05 WS-DISP-MSG       PIC X(15)   VALUE SPACES.
-      *    Boolean variable to determine if the response is OK or not
-           05 WS-RESP-OK        PIC X(1)    VALUE 'N'.
-      *    Boolean to determine if silent operation
-           05 WS-SILENT         PIC X(1)    VALUE 'N'.
-      *    Member YES/NO/END
-           05 WS-MEMBER-RESP    PIC X(3)    VALUE SPACES.
-      *    Product Code as string
-           05 WS-PRODUCT-RESP   PIC X(2)    VALUE SPACES.
-      *    Product code as number
-           05 WS-PRODUCT-NUM    PIC 9(2)    VALUE 0.
-      *    Formatted product code
-           05 WS-PRODUCT-CODE   PIC 9(4)    VALUE 0.
-      *    Product description
-           05 WS-PRODUCT-DESC   PIC X(35)   VALUE SPACES.
-      *    Formatted product price
-           05 WS-PRODUCT-PRICE  PIC 9(5)V99 VALUE 0.
-      *    Quantity as string
-           05 WS-QUANT-RESP     PIC X(2)    VALUE SPACES.
-      *    Quantity as number
-           05 WS-QUANT-NUM      PIC 9(2)    VALUE 0.
-      *    DELIVERY/PICK-UP
-           05 WS-DELIVERY       PIC X(15)   VALUE SPACES.
-      *    Numerical indicator for DELIVERY/PICK-UP 1 OR 2
-           05 WS-DELIVERY-NUM   PIC 9       VALUE 0.
-      *    Calculated shipping fee formatted
-           05 WS-SHIP-FEE       PIC 9(5)V99 VALUE 0.
-      *    Calculated cost formatted
-           05 WS-COST           PIC 9(5)V99 VALUE 0.
-      *    Calculated total cost formatted
-           05 WS-TOTAL-COST     PIC 9(5)V99 VALUE 0.
       *    Used for the report generation to indicate if a record has 
       *    been found
-           05 WS-FOUND          PIC X(1)    VALUE 'N'.
+       01  WS-FOUND          PIC X(1)    VALUE 'N'.
       *    Calculated quantity
-           05 WS-REPORT-Q       PIC 9(4).
+       01  WS-REPORT-Q       PIC 9(4).
       *    Calculated cost
-           05 WS-REPORT-C       PIC 9(5)V99.
-      *    Total errors detected
-           05 WS-ERRORS         PIC 9(4)    VALUE 0.
-      *    Query if the program is to run interactively or note
-           05 WS-INTERACT-RESP  PIC X(1)    VALUE SPACE.
-             
+       01  WS-REPORT-C       PIC 9(5)V99.
+       01  WS-ERRORS         PIC 9(4)    VALUE 0.
+
+      *    Temporary Data structures and their numerical counterparts
+       01  WS-SHOPPING-CART-DS.
+           05  WS-MEMBER-RESP   PIC X(3).
+           05  WS-PRODUCT-RESP  PIC X(2).
+           05  WS-PRODUCT-NUM   PIC 9(2).
+           05  WS-QUANT-RESP    PIC X(2).
+           05  WS-QUANT-NUM     PIC 9(2).
+           05  WS-DELIVERY      PIC X(15).
+           05  WS-PRODUCT-CODE  PIC 9(4).
+           05  WS-PRODUCT-DESC  PIC X(35).
+           05  WS-PRODUCT-PRICE PIC 9(5)V99.
+           05  WS-SHIP-FEE      PIC 9(5)V99.
+           05  WS-COST          PIC 9(5)V99.
+           05  WS-TOTAL-COST    PIC 9(5)V99.
+
+      *    So I do not have to type over and over and over again
+           05  WS-DELIVERY-METHODS.
+               10 WS-DEL   PIC X(8) VALUE "DELIVERY".
+               10 WS-PU    PIC X(7) VALUE "PICK-UP".
 
       *    *************************************************************
       *
@@ -212,36 +185,17 @@
       *
       *    *************************************************************
        01  HOMEWARECITY-STORAGE.
-      *    Manual indexing of the product table
-           05 HWC-IDXC   PIC 9(4).
-      *    Manual calculation of the product code
-           05 HWC-CODE   PIC 9(2).
-      *    Shopping cart table index manual method
-           05 SCT-INDEX  PIC 9(10).
-      *    Count of the table for the shopping cart
-           05 SCT-COUNT  PIC 9(10).
-      *    Index counter for Shopping Cart Table
-           05 SCT-IDXC   PIC 9(4).
-      *    Index counter for Shopping Cart Report
-           05 SCR-IDXC   PIC 9(4).
-      *    Total for the Shopping Cart Table to be displayed
-      *    05 SCTD-TOTAL     PIC Z(5).99.
+      *    Counter for Product Catalogue Table index
+           05 HWC-IDXC  PIC 9(4).
+      *    Temporary variable for product code
+           05 HWC-CODE  PIC 9(4).
+      *    Counter for Error Table index
+           05 ERR-IDXC  PIC 9(4).
+      *    Counter for Shopping Cart Table index
+           05 SCT-IDXC  PIC 9(4).
+      *    Counter for Shipping Report Table index
+           05 SCR-IDXC  PIC 9(4).
 
-      *    *************************************************************
-      *
-      *    Data structures for the tables
-      *
-      *    *************************************************************
-           
-           05 ERROR-LOG OCCURS 9999 TIMES INDEXED BY ERR-IDX.
-             10 EL-MESSAGE          PIC X(80).
-             10 FILLER              PIC X(4).
-             10 EL-LINE             PIC 9(7).
-           
-           05 ERROR-LOG-DISPLAY.
-             10 ERD-MESSAGE         PIC X(80).
-             10 FILLER              PIC X(4).
-             10 ERD-LINE            PIC Z(7).
       *    *************************************************************
       *
       *    Product Catalogue Table Data structures
@@ -249,8 +203,8 @@
       *    *************************************************************
 
       *    Structure for Product catalogue table
-           05 PRODUCT-CATALOGUE-TABLE OCCURS 40 TIMES
-                                      INDEXED BY HWC-IDX.
+           05  PRODUCT-CATALOGUE-TABLE 
+               OCCURS 40 TIMES INDEXED BY HWC-IDX.
              10 PCT-CODE            PIC 9(4).
              10 PCT-PRODUCT         PIC X(35).
              10 PCT-PRICE           PIC 9(5)V99.
@@ -269,7 +223,24 @@
              10 PCH-CODE-U-LINE  PIC X(4).
              10 PCH-PROD-U-LINE  PIC X(35).
              10 PCH-PRICE-U-LINE PIC X(8).
+      
+      *    *************************************************************
+      *    
+      *    Error logging table and corresponding display
+      *
+      *    *************************************************************
            
+           05  ERROR-LOG 
+               OCCURS 9999 TIMES INDEXED BY ERR-IDX.
+             10 EL-MESSAGE  PIC X(20).
+             10 FILLER      PIC X(4).
+             10 EL-LINE     PIC 9(7).
+           
+           05 ERROR-LOG-DISPLAY.
+             10 ERD-MESSAGE  PIC X(20).
+             10 FILLER       PIC X(4).
+             10 ERD-LINE     PIC Z(7).
+
       *    *************************************************************
       *
       *    Shopping Cart Table Data structures
@@ -277,53 +248,37 @@
       *    *************************************************************
            
       *    Structure of table shopping cart
-           05 SHOPPING-CART-TABLE-INDEXED OCCURS 9999 TIMES
-               ASCENDING KEY IS SCTI-CODE
+           05  SHOPPING-CART-TABLE-INDEXED 
+               OCCURS 9999 TIMES
+               ASCENDING KEY IS SCT-CODE
                INDEXED BY SCT-IDX.
-             10 SCTI-MEMBER    PIC X(3).
-             10 SCTI-CODE      PIC 9(4).
-             10 SCTI-PRODUCT   PIC X(35).
-             10 SCTI-PRICE     PIC 9(5)V9(2).
-             10 SCTI-QUANTITY  PIC 9(2).
-             10 SCTI-METHOD    PIC X(15).
-             10 SCTI-FEE       PIC 9(5)V99.
-             10 SCTI-COST      PIC 9(5)V99.
+             10 SCT-MEMBER    PIC X(3).
+             10 SCT-CODE      PIC 9(4).
+             10 SCT-PRODUCT   PIC X(35).
+             10 SCT-PRICE     PIC 9(5)V9(2).
+             10 SCT-QUANTITY  PIC 9(2).
+             10 SCT-METHOD    PIC X(15).
+             10 SCT-FEE       PIC 9(5)V99.
+             10 SCT-COST      PIC 9(5)V99.
 
       *    Structure for headers for shopping cart
            05 SHOPPING-CART-TABLE-HEADERS.
-             10 SCTH-MEMBER    PIC X(10)    VALUE "MEMBER".
+             10 SCTH-MEMBER    PIC X(10).
              10 FILLER         PIC X(4).
-             10 SCTH-CODE      PIC X(4)     VALUE "CODE".
+             10 SCTH-CODE      PIC X(4).
              10 FILLER         PIC X(4).
-             10 SCTH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+             10 SCTH-PRODUCT   PIC X(35).
              10 FILLER         PIC X(4).
-             10 SCTH-PRICE     PIC X(8)     VALUE "$  PRICE".
+             10 SCTH-PRICE     PIC X(8).
              10 FILLER         PIC X(4).
-             10 SCTH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+             10 SCTH-QUANTITY  PIC X(8).
              10 FILLER         PIC X(4).
-             10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
+             10 SCTH-METHOD    PIC X(15).
              10 FILLER         PIC X(4).
-             10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
+             10 SCTH-FEE       PIC X(12).
              10 FILLER         PIC X(4).
-             10 SCTH-COST      PIC X(8)     VALUE "$   COST".
-           
-           05 SHOPPING-CART-TABLE-U-LINE.
-             10 SCTH-MEMBER-U    PIC X(10).
-             10 FILLER           PIC X(4).
-             10 SCTH-CODE-U      PIC X(4).
-             10 FILLER           PIC X(4).
-             10 SCTH-PRODUCT-U   PIC X(35).
-             10 FILLER           PIC X(4).
-             10 SCTH-PRICE-U     PIC X(8).
-             10 FILLER           PIC X(4).
-             10 SCTH-QUANTITY-U  PIC X(8).
-             10 FILLER           PIC X(4).
-             10 SCTH-METHOD-U    PIC X(15).
-             10 FILLER           PIC X(4).
-             10 SCTH-FEE-U       PIC X(12).
-             10 FILLER           PIC X(4).
-             10 SCTH-COST-U      PIC X(8).
-
+             10 SCTH-COST      PIC X(8).
+       
       *    Display data structure for shopping cart
            05 SHOPPING-CART-TABLE-DISPLAY.
              10 SCTD-MEMBER    PIC X(10).
@@ -345,7 +300,7 @@
            05 SHOPPING-CART-TOTAL-DISPLAY.
              10 FILLER         PIC X(8) VALUE "TOTAL $ ".
              10 SCTD-TOTAL     PIC Z(5).99.
-           
+      
       *    Temporary data structure for Bubble sort
            05 TEMP-CART.
              10 FILLER    PIC X(3).
@@ -355,24 +310,25 @@
              10 FILLER    PIC 9(2).
              10 FILLER    PIC X(15).
              10 FILLER    PIC 9(5)V99.
-             10 FILLER    PIC 9(5)V99.  
+             10 FILLER    PIC 9(5)V99. 
 
       *    *************************************************************
       *
-      *    Shopping Cart Report Data structures
+      *    Shipping Report Data structures
       *
       *    *************************************************************
 
       *    Shopping cart report data structure
-           05 SHOPPING-CART-REPORT-INDEX OCCURS 9999 TIMES
+           05 SHIPPING-REPORT-INDEX OCCURS 9999 TIMES
                INDEXED BY SCR-IDX.
              10 SCRI-CODE      PIC 9(4).
              10 SCRI-PRODUCT   PIC X(35).
              10 SCRI-PRICE     PIC 9(5)V99.
              10 SCRI-QUANTITY  PIC 9(4).
              10 SCRI-COST      PIC 9(5)V99.
-           
-           05 SHOPPING-CART-REPORT-DISPLAY.
+      
+      *    Shopping cart report display structure
+           05 SHIPPING-REPORT-DISPLAY.
              10 SCRD-CODE      PIC Z(4).
              10 FILLER         PIC X(4).
              10 SCRD-PRODUCT   PIC X(35).
@@ -382,121 +338,687 @@
              10 SCRD-QUANTITY  PIC Z(8).
              10 FILLER         PIC X(4).
              10 SCRD-COST      PIC Z(5).99.
-           
-           05 SHOPPING-CART-REPORT-HEADER.
-             10 SCRH-CODE      PIC X(4)     VALUE "CODE".
+      
+      *    Shipping report header
+       05 SHIPPING-REPORT-HEADER.
+             10 SCRH-CODE      PIC X(4).
              10 FILLER         PIC X(4).
-             10 SCRH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+             10 SCRH-PRODUCT   PIC X(35).
              10 FILLER         PIC X(4).
-             10 SCRH-PRICE     PIC X(8)     VALUE "$  PRICE".
+             10 SCRH-PRICE     PIC X(8).
              10 FILLER         PIC X(4).
-             10 SCRH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+             10 SCRH-QUANTITY  PIC X(8).
              10 FILLER         PIC X(4).
-             10 SCRH-COST      PIC X(8)     VALUE "$   COST".
-
-           05 SHOPPING-CART-REPORT-U-LINE.
-             10 SCRH-CODE-U      PIC X(4).
-             10 FILLER           PIC X(4).
-             10 SCRH-PRODUCT-U   PIC X(35).
-             10 FILLER           PIC X(4).
-             10 SCRH-PRICE-U     PIC X(8).
-             10 FILLER           PIC X(4).
-             10 SCRH-QUANTITY-U  PIC X(8).
-             10 FILLER           PIC X(4).
-             10 SCRH-COST-U      PIC X(8).
+             10 SCRH-COST      PIC X(8).
 
       *    *************************************************************
       *
-      *    Main body of code
+      *    Begin the code block
       *
       *    *************************************************************
-       
+
        PROCEDURE DIVISION.
-      *    REQUIRED FUNCTION
            PERFORM BUILD-CATALOGUE-TABLE
-      *    REQUIRED FUNCTION
            
            PERFORM QUERY-WRITE-DATASETS
-      *    DISPLAY "IS THIS TO BE RUN INTERACTIVELY OR " 
-      *            "NON-INTERACTIVELY? (Y/N): "
-      *            WITH NO ADVANCING
-      *    ACCEPT WS-INTERACT-RESP
-      *    
-      *    EVALUATE TRUE
-      *     WHEN WS-INTERACT-RESP = "Y"
-      *       PERFORM QUERY-USER-VERSION
-      *     WHEN WS-INTERACT-RESP = "N"
-      *       PERFORM QUERY-NON-INTERACTIVE-VERSION
-      *     WHEN OTHER
-      *       DISPLAY "GOOD BYE."
-      *    END-EVALUATE
 
            STOP RUN.
-       
+
       *    *************************************************************
       *
-      *    User interactive version of the code
+      *    Build the product catalogue database from the product list and
+      *    the product price list
       *
       *    *************************************************************
+
+       BUILD-CATALOGUE-TABLE.
+           OPEN INPUT CSV-PRODUCT-FILE.
+           SET HWC-IDX TO 1
+           PERFORM READ-AND-BUILD-TABLE UNTIL WS-EOF01 EQUAL 'Y'
+             
+           CLOSE CSV-PRODUCT-FILE
       
-       QUERY-USER-VERSION.
-      *    Commented out as this need to be done regardless of 
-      *    automation of manual input
-           MOVE 1 TO SCT-INDEX
-           SET SCT-IDX TO 1
+           MOVE 'N' TO WS-EOF01
+       .
+      
+      *    Read each line from the file until EOF has been hit.
 
-           PERFORM UNTIL WS-MEMBER-RESP EQUAL "END"
-             PERFORM QUERY-IS-MEMBER
-             IF WS-MEMBER-RESP NOT EQUAL "END"
-               PERFORM DISPLAY-CATALOGUE
-               PERFORM QUERY-PRODUCT-CODE
-               PERFORM SEARCH-PRODUCT-CODE
-               PERFORM QUERY-QUANTITY
-               PERFORM QUERY-DELIVERY-METHOD
-               PERFORM CALCULATE-SHIP-FEE
-               PERFORM CALCULATE-COST
+       READ-AND-BUILD-TABLE.
+           READ CSV-PRODUCT-FILE
+             AT END MOVE 'Y' TO WS-EOF01
+             NOT AT END
+               MOVE HWC-IDX TO HWC-IDXC
+               MOVE HWC-IDXC TO HWC-CODE
+               MOVE HWC-CODE TO PCT-CODE(HWC-IDX)
+               UNSTRING CSV-PROD-RECORD
+                 DELIMITED BY ','
+                 INTO 
+                   PCT-PRODUCT(HWC-IDX)
+                   PCT-PRICE(HWC-IDX)
+               SET HWC-IDX UP BY 1
+       .
+      
+      *    *************************************************************
+      *
+      *    Display the catalogue formatted in two columns with 
+      *    headers and decorators
+      *
+      *    *************************************************************
 
-               PERFORM CONSOLIDATE-DATA-TO-TABLE-INDEXED
+      *DISPLAY-PRODUCT-TABLE.
+      *    SET HWC-IDX TO 1
+      *
+      *    PERFORM VARYING HWC-IDX FROM 1 BY 1 UNTIL HWC-IDX
+      *            GREATER THAN HWC-IDXC
+      *      MOVE PCT-CODE(HWC-IDX) TO PCD-CODE
+      *      MOVE PCT-PRODUCT(HWC-IDX) TO PCD-PRODUCT
+      *      MOVE PCT-PRICE(HWC-IDX) TO PCD-PRICE
+      *
+      *      DISPLAY PCD-CODE WS-GAP
+      *              PCD-PRODUCT WS-GAP
+      *              PCD-PRICE WS-GAP
+      *    END-PERFORM
+      *.
+
+      *    *************************************************************
+      *
+      *    Display the catalogue formatted in two columns with 
+      *    headers and decorators
+      *
+      *    *************************************************************
+
+      *DISPLAY-CATALOGUE.
+      *    PERFORM DISPLAY-CATALOGUE-HEADERS
+      *    SET HWC-IDX TO 1
+      *    MOVE 0 TO WS-COLS
+      *
+      *    PERFORM VARYING HWC-IDX FROM 1 BY 1 
+      *                            UNTIL HWC-IDX GREATER HWC-IDXC
+      *      MOVE PCT-CODE(HWC-IDX) TO PCD-CODE
+      *      MOVE PCT-PRODUCT(HWC-IDX) TO PCD-PRODUCT
+      *      MOVE PCT-PRICE(HWC-IDX) TO PCD-PRICE
+      *      IF WS-COLS EQUAL 0 THEN
+      *        DISPLAY PCD-CODE WS-GAP
+      *                PCD-PRODUCT WS-GAP
+      *                PCD-PRICE WS-GAP
+      *                WITH NO ADVANCING
+      *      ELSE
+      *        DISPLAY PCD-CODE WS-GAP
+      *                PCD-PRODUCT WS-GAP
+      *                PCD-PRICE WS-GAP           
+      *      END-IF
+      *      
+      *      ADD 1 TO WS-COLS
+      *      IF WS-COLS EQUAL 2 THEN
+      *        MOVE 0 TO WS-COLS
+      *      END-IF
+      *
+      *    END-PERFORM
+      *.
+
+      *    *************************************************************
+      *
+      *    Generate the headers for the product catalogue table
+      *
+      *    *************************************************************
+
+       DISPLAY-CATALOGUE-HEADERS.
+           MOVE 0 TO WS-COLS
+           MOVE "Y" TO WS-TORU
+           PERFORM GENERATE-TITLE-COLUMN UNTIL WS-COLS EQUAL 2
+
+           MOVE 0 TO WS-COLS
+           MOVE "N" TO WS-TORU
+           
+           MOVE WS-DASH TO PCH-CODE-U-LINE
+           MOVE WS-DASH TO PCH-PROD-U-LINE
+           MOVE WS-DASH TO PCH-PRICE-U-LINE
+
+           PERFORM GENERATE-TITLE-COLUMN UNTIL WS-COLS EQUAL 2
+       .
+
+      *    *************************************************************
+      *
+      *    Generate the columns for the title and the decorations
+      *    depending on whether it is the first or second column
+      *
+      *    *************************************************************
+
+       GENERATE-TITLE-COLUMN.
+           IF WS-TORU EQUAL "Y" THEN
+             IF WS-COLS EQUAL 0 THEN
+               DISPLAY 
+                 PCH-CODE WS-GAP
+                 PCH-PROD WS-GAP
+                 PCH-PRICE WS-GAP
+                 WITH NO ADVANCING 
+             ELSE
+               DISPLAY
+                 PCH-CODE WS-GAP
+                 PCH-PROD WS-GAP
+                 PCH-PRICE WS-GAP
              END-IF
-           END-PERFORM.
-           
-           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
-           DISPLAY " ... "
-           PERFORM SORT-TABLE
-           PERFORM GENERATE-SHIPPING-REPORT
-           PERFORM DISPLAY-SHIPPING-REPORT
-      
-           .
-      
+             ADD 1 TO WS-COLS
+           ELSE
+             IF WS-COLS EQUAL 0 THEN
+               DISPLAY PCH-CODE-U-LINE WS-GAP
+                       PCH-PROD-U-LINE WS-GAP
+                       PCH-PRICE-U-LINE WS-GAP
+                       WITH NO ADVANCING
+             ELSE
+               DISPLAY PCH-CODE-U-LINE WS-GAP
+                       PCH-PROD-U-LINE WS-GAP
+                       PCH-PRICE-U-LINE WS-GAP
+             END-IF
+             ADD 1 TO WS-COLS
+           END-IF
+       .
+
       *    *************************************************************
       *
-      *    Non-user interactive version of the code
+      *    Write datasets
       *
-      *    ************************************************************* 
-       QUERY-NON-INTERACTIVE-VERSION.
-           PERFORM PROCESS-SHOPPING-CART
-           
-           DISPLAY " "
-           PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
-      *    PERFORM WRITE-CONSOLIDATED-DATA
-           
-           DISPLAY " "
+      *    *************************************************************
 
+       QUERY-WRITE-DATASETS.
+           PERFORM PROCESS-SHOPPING-CART-ORDERS
+           PERFORM WRITE-CONSOLIDATED-DATA
            PERFORM SORT-TABLE
            PERFORM GENERATE-SHIPPING-REPORT
-           PERFORM DISPLAY-SHIPPING-REPORT
-      *    PERFORM WRITE-SHIPPING-REPORT
+           PERFORM WRITE-SHIPPING-REPORT
+           PERFORM WRITE-ERROR-REPORT
+       .
 
-           DISPLAY " "
-           DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
+      *    *************************************************************
+      *
+      *    Process the orders from the shopping cart
+      *
+      *    *************************************************************
 
-           PERFORM VARYING ERR-IDX FROM 1 BY 1 
-                                   UNTIL ERR-IDX EQUAL WS-ERRORS
-             DISPLAY "ERROR ON LINE: "
-                     EL-LINE(ERR-IDX)
-                     " ERROR: "
-                     EL-MESSAGE(ERR-IDX)
+       PROCESS-SHOPPING-CART-ORDERS.
+           MOVE "N" TO WS-EOF01
+           MOVE 0 TO WS-CART-LINES
+           MOVE "N" TO WS-RESP-OK
+           MOVE "N" TO WS-DISP-ERR
+           SET ERR-IDX TO 1
+
+           OPEN INPUT CSV-SHOPPING-CART-FILE
+           PERFORM READ-SHOPPING-ORDERS UNTIL WS-EOF01 EQUAL "Y"
+
+           CLOSE CSV-SHOPPING-CART-FILE
+           MOVE "N" TO WS-EOF01
+       .
+
+      *    *************************************************************
+      *
+      *    Read the orders from the shopping cart
+      *
+      *    *************************************************************
+
+       READ-SHOPPING-ORDERS.
+           READ CSV-SHOPPING-CART-FILE
+             AT END MOVE "Y" TO WS-EOF01
+             NOT AT END
+               UNSTRING CSV-SHOPPING-CART-RECORD
+                 DELIMITED BY "," INTO
+                   WS-MEMBER-RESP
+                   WS-PRODUCT-RESP
+                   WS-QUANT-RESP
+                   WS-DELIVERY
+
+      *    Track the shopping cart order line number
+               ADD 1 TO WS-CART-LINES
+      *    What is the member status, and is it correct?
+               PERFORM PROCESS-IS-MEMBER
+               IF WS-RESP-OK EQUAL "Y" THEN
+      *    What is the product code?
+                 PERFORM PROCESS-PRODUCT-CODE
+                 IF WS-RESP-OK EQUAL "Y" THEN
+      *    How much product is being dispatched
+                   PERFORM PROCESS-QUANTITY
+                   IF WS-RESP-OK EQUAL "Y" THEN
+      *    How is the product being dispatched
+                     PERFORM PROCESS-DELIVERY
+                     IF WS-RESP-OK EQUAL "Y" THEN
+      *    Calculate the shipping fee
+                       PERFORM CALCULATE-SHIP-FEE
+      *    Calculate the cost
+                       PERFORM CALCULATE-COST
+      *    Combine all the data points into the table
+                       PERFORM CONSOLIDATE-SHOPPING-DATA-TO-TABLE
+                     ELSE
+                       MOVE "Y" TO WS-DISP-ERR
+                       MOVE "DELIVERY" TO WS-DISP-MSG
+                   ELSE
+                     MOVE "Y" TO WS-DISP-ERR
+                     MOVE "QUANTITY" TO WS-DISP-MSG
+                   END-IF
+                 ELSE
+                   MOVE "Y" TO WS-DISP-ERR
+                   MOVE "CODE" TO WS-DISP-MSG
+                 END-IF
+               ELSE
+                 MOVE "Y" TO WS-DISP-ERR
+                 MOVE "MEMBER" TO WS-DISP-MSG
+               END-IF
+               
+      *    If an error has been detected log that error
+               IF WS-DISP-ERR EQUAL "Y" THEN
+                 ADD 1 TO WS-ERRORS
+                 MOVE WS-CART-LINES TO EL-LINE(ERR-IDX)
+                 MOVE WS-DISP-MSG TO EL-MESSAGE(ERR-IDX)
+                 SET ERR-IDX UP BY 1
+                 MOVE ERR-IDX TO ERR-IDXC
+               END-IF
+       .
+
+      *    *************************************************************
+      *
+      *    Process Member Status
+      *
+      *    *************************************************************
+
+       PROCESS-IS-MEMBER.
+           MOVE "N" TO WS-RESP-OK
+           PERFORM VALIDATE-MEMBER
+       .
+
+      *    *************************************************************
+      *
+      *    Validate the member status
+      *
+      *    *************************************************************
+
+       VALIDATE-MEMBER.
+           EVALUATE WS-MEMBER-RESP
+             WHEN "YES"
+               MOVE "Y" TO WS-RESP-OK
+             WHEN "NO"
+               MOVE "Y" TO WS-RESP-OK
+             WHEN "END"
+               MOVE "Y" TO WS-RESP-OK
+             WHEN OTHER
+              MOVE "N" TO WS-RESP-OK
+       .
+
+      *    *************************************************************
+      *
+      *    Process product code and if valid search for the product
+      *
+      *    *************************************************************
+
+       PROCESS-PRODUCT-CODE.
+           MOVE "N" TO WS-RESP-OK
+
+           COMPUTE WS-PRODUCT-NUM = FUNCTION NUMVAL(WS-PRODUCT-RESP)
+           PERFORM VALIDATE-PRODUCT-CODE
+           IF WS-RESP-OK EQUAL "Y" THEN
+             PERFORM SEARCH-PRODUCT-CODE
+       .
+
+      *    *************************************************************
+      *
+      *    Validate product code is within the appropriate ranges
+      *
+      *    *************************************************************
+
+       VALIDATE-PRODUCT-CODE.
+           EVALUATE TRUE
+            WHEN WS-PRODUCT-NUM GREATER 0 AND WS-PRODUCT-NUM LESS 41
+              MOVE "Y" TO WS-RESP-OK
+            WHEN OTHER
+              MOVE "N" TO WS-RESP-OK
+       .
+
+      *    *************************************************************
+      *    
+      *    Search for the product based on the product code
+      *    
+      *    *************************************************************
+
+       SEARCH-PRODUCT-CODE.
+           SET HWC-IDX TO 1
+           SEARCH PRODUCT-CATALOGUE-TABLE
+             AT END
+               DISPLAY "ITEM NO FOUND"
+             WHEN PCT-CODE(HWC-IDX) EQUAL WS-PRODUCT-NUM
+               MOVE PCT-CODE(HWC-IDX) TO WS-PRODUCT-CODE
+               MOVE PCT-PRODUCT(HWC-IDX) TO WS-PRODUCT-DESC
+               MOVE PCT-PRICE(HWC-IDX) TO WS-PRODUCT-PRICE
+       .
+
+      *    *************************************************************
+      *
+      *    Process the quantity of product being ordered
+      *
+      *    *************************************************************
+
+       PROCESS-QUANTITY.
+           MOVE "N" TO WS-RESP-OK
+
+           COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
+           PERFORM VALIDATE-QUANTITY
+       .
+
+      *    *************************************************************
+      *
+      *    Validate the quantity range
+      *    
+      *    *************************************************************
+
+       VALIDATE-QUANTITY.
+           EVALUATE TRUE
+            WHEN WS-QUANT-NUM GREATER 0 AND LESS 30
+              MOVE "Y" TO WS-RESP-OK
+            WHEN OTHER
+              MOVE "N" TO WS-RESP-OK
+           END-EVALUATE
+       .
+
+      *    *************************************************************
+      *
+      *    Process delivery methods
+      *
+      *    *************************************************************
+
+       PROCESS-DELIVERY.
+           MOVE "N" TO WS-RESP-OK
+           PERFORM VALIDATE-DELIVERY-METHOD
+       .
+
+      *    *************************************************************
+      *
+      *    Validate the delivery methods
+      *
+      *    *************************************************************
+       
+       VALIDATE-DELIVERY-METHOD.
+           EVALUATE WS-DELIVERY
+             WHEN WS-DEL
+               MOVE "Y" TO WS-RESP-OK
+             WHEN WS-PU
+               MOVE "Y" TO WS-RESP-OK
+             WHEN OTHER
+              MOVE "N" TO WS-RESP-OK
+       .
+
+      *    *************************************************************
+      *
+      *    Calculate shipping fee
+      *
+      *    *************************************************************
+
+       CALCULATE-SHIP-FEE.
+           MOVE 0 TO WS-SHIP-FEE
+
+           IF WS-DELIVERY EQUAL WS-DEL THEN
+             IF WS-QUANT-NUM GREATER THAN 1 THEN
+               COMPUTE WS-SHIP-FEE = 2.00 +
+                       (( WS-QUANT-NUM - 1) * 1.60 )
+             ELSE
+               MOVE 2.00 TO WS-SHIP-FEE
+             END-IF
+           END-IF
+       .
+
+      *    *************************************************************
+      *
+      *    Calculate overall cost
+      *
+      *    *************************************************************
+
+       CALCULATE-COST.
+           MOVE 0 to WS-COST
+
+           COMPUTE WS-COST = (WS-QUANT-NUM * WS-PRODUCT-PRICE) +
+                             WS-SHIP-FEE
+           
+           IF WS-MEMBER-RESP EQUAL "YES" THEN
+             COMPUTE WS-COST = WS-COST * (90 / 100)
+           END-IF
+       .
+
+      *    *************************************************************
+      *
+      *    Consolidate the data into the table
+      *
+      *    *************************************************************
+       
+       CONSOLIDATE-SHOPPING-DATA-TO-TABLE.
+           MOVE WS-MEMBER-RESP TO SCT-MEMBER(SCT-IDX)
+           MOVE WS-PRODUCT-CODE TO SCT-CODE(SCT-IDX)
+           MOVE WS-PRODUCT-DESC TO SCT-PRODUCT(SCT-IDX)
+           MOVE WS-PRODUCT-PRICE TO SCT-PRICE(SCT-IDX)
+           MOVE WS-QUANT-NUM TO SCT-QUANTITY(SCT-IDX)
+           MOVE WS-DELIVERY TO SCT-METHOD(SCT-IDX)
+           MOVE WS-SHIP-FEE TO SCT-FEE(SCT-IDX)
+           MOVE WS-COST TO SCT-COST(SCT-IDX)
+
+           SET SCT-IDX UP BY 1
+           MOVE SCT-IDX TO SCT-IDXC
+           
+      *    Monitor the amount of records being tracked and notify
+           IF SCT-IDXC EQUAL 9900 OR GREATER 9900 THEN
+             DISPLAY " *** WARNING: " SCT-IDXC
+                     " RECORDS OF: " WS-MAX " ***"
+       .
+
+      *    *************************************************************
+      *
+      *    Write the consolidated data to disk
+      *
+      *    *************************************************************
+
+       WRITE-CONSOLIDATED-DATA.
+           MOVE 0 TO WS-TOTAL-COST
+           SET SHOP-CART TO TRUE
+
+           OPEN OUTPUT SHOPCART-REPORT-FILE
+             MOVE "Y" TO WS-TORU
+             PERFORM SETUP-REPORT-HEADERS
+             WRITE SHOPCART-HEADERS FROM SHOPPING-CART-TABLE-HEADERS
+             MOVE "N" TO WS-TORU
+             PERFORM SETUP-REPORT-HEADERS
+             WRITE SHOPCART-HEADERS FROM SHOPPING-CART-TABLE-HEADERS
+
+             PERFORM VARYING SCT-IDX FROM 1 BY 1 
+                     UNTIL SCT-IDX EQUAL SCT-IDXC
+               MOVE SCT-MEMBER(SCT-IDX)   TO SCTD-MEMBER
+               MOVE SCT-CODE(SCT-IDX)     TO SCTD-CODE
+               MOVE SCT-PRODUCT(SCT-IDX)  TO SCTD-PRODUCT
+               MOVE SCT-PRICE(SCT-IDX)    TO SCTD-PRICE
+               MOVE SCT-QUANTITY(SCT-IDX) TO SCTD-QUANTITY
+               MOVE SCT-METHOD(SCT-IDX)   TO SCTD-METHOD
+               MOVE SCT-FEE(SCT-IDX)      TO SCTD-FEE
+               MOVE SCT-COST(SCT-IDX)     TO SCTD-COST
+               COMPUTE WS-TOTAL-COST = WS-TOTAL-COST + 
+                                       SCT-COST(SCT-IDX)
+               WRITE SHOPCART-REPORT FROM SHOPPING-CART-TABLE-DISPLAY
+             END-PERFORM
+
+             MOVE WS-TOTAL-COST TO SCTD-TOTAL
+             WRITE SHOPCART-REPORT-TOTAL FROM
+                   SHOPPING-CART-TOTAL-DISPLAY
+                   AFTER ADVANCING 1 LINE
+           CLOSE SHOPCART-REPORT-FILE
+       .
+
+      *    *************************************************************
+      *
+      *    Setup the headers for each of the reports
+      *    
+      *    *************************************************************
+
+       SETUP-REPORT-HEADERS.
+           EVALUATE TRUE
+             WHEN SHOP-CART
+               IF WS-TORU EQUAL "Y" THEN
+                 MOVE "MEMBER"           TO SCTH-MEMBER
+                 MOVE "CODE"             TO SCTH-CODE
+                 MOVE "PRODUCT"          TO SCTH-PRODUCT
+                 MOVE "$  PRICE"         TO SCTH-PRICE
+                 MOVE "QUANTITY"         TO SCTH-QUANTITY
+                 MOVE "SHIPPING METHOD"  TO SCTH-METHOD
+                 MOVE "SHIPPING FEE"     TO SCTH-FEE
+                 MOVE "$   COST"         TO SCTH-COST
+               ELSE
+                 MOVE WS-DASH TO SCTH-MEMBER
+                 MOVE WS-DASH TO SCTH-CODE
+                 MOVE WS-DASH TO SCTH-PRODUCT
+                 MOVE WS-DASH TO SCTH-PRICE
+                 MOVE WS-DASH TO SCTH-QUANTITY
+                 MOVE WS-DASH TO SCTH-METHOD
+                 MOVE WS-DASH TO SCTH-FEE
+                 MOVE WS-DASH TO SCTH-COST
+               END-IF
+             WHEN SHIP-REP
+               IF WS-TORU EQUAL "Y" THEN
+                 MOVE "CODE"             TO SCRH-CODE
+                 MOVE "PRODUCT"          TO SCRH-PRODUCT
+                 MOVE "$  PRICE"         TO SCRH-PRICE
+                 MOVE "QUANTITY"         TO SCRH-QUANTITY
+                 MOVE "$   COST"         TO SCRH-COST
+               ELSE
+                 MOVE WS-DASH TO SCRH-CODE
+                 MOVE WS-DASH TO SCRH-PRODUCT
+                 MOVE WS-DASH TO SCRH-PRICE
+                 MOVE WS-DASH TO SCRH-QUANTITY
+                 MOVE WS-DASH TO SCRH-COST
+               END-IF
+
+      *    IF SHOP-CART THEN
+      *      IF WS-TORU EQUAL "Y" THEN
+      *        MOVE "MEMBER"           TO SCTH-MEMBER
+      *        MOVE "CODE"             TO SCTH-CODE
+      *        MOVE "PRODUCT"          TO SCTH-PRODUCT
+      *        MOVE "$  PRICE"         TO SCTH-PRICE
+      *        MOVE "QUANTITY"         TO SCTH-QUANTITY
+      *        MOVE "SHIPPING METHOD"  TO SCTH-METHOD
+      *        MOVE "SHIPPING FEE"     TO SCTH-FEE
+      *        MOVE "$   COST"         TO SCTH-COST
+      *      ELSE
+      *        MOVE WS-DASH TO SCTH-MEMBER
+      *        MOVE WS-DASH TO SCTH-CODE
+      *        MOVE WS-DASH TO SCTH-PRODUCT
+      *        MOVE WS-DASH TO SCTH-PRICE
+      *        MOVE WS-DASH TO SCTH-QUANTITY
+      *        MOVE WS-DASH TO SCTH-METHOD
+      *        MOVE WS-DASH TO SCTH-FEE
+      *        MOVE WS-DASH TO SCTH-COST
+      *    IF SHIP-REP THEN
+      *      IF WS-TORU EQUAL "Y" THEN
+      *        MOVE "CODE"             TO SCTH-CODE
+      *        MOVE "PRODUCT"          TO SCTH-PRODUCT
+      *        MOVE "$  PRICE"         TO SCTH-PRICE
+      *        MOVE "QUANTITY"         TO SCTH-QUANTITY
+      *        MOVE "$   COST"         TO SCTH-COST
+      *      ELSE
+      *        MOVE WS-DASH TO SCTH-CODE
+      *        MOVE WS-DASH TO SCTH-PRODUCT
+      *        MOVE WS-DASH TO SCTH-PRICE
+      *        MOVE WS-DASH TO SCTH-QUANTITY
+      *        MOVE WS-DASH TO SCTH-COST
+      *      END-IF
+      *    END-IF
+       .
+
+      *    *************************************************************
+      *
+      *    Functions and methods to perform Bubble sort
+      *    This is based loosely on the W3 School Python version
+      *
+      *    *************************************************************
+
+       SORT-TABLE.
+           PERFORM VARYING I FROM 1 BY 1 UNTIL I EQUAL SCT-IDXC
+             PERFORM VARYING J FROM I BY 1 UNTIL J EQUAL SCT-IDXC
+               IF SCT-CODE(I) > SCT-CODE(J)
+                 PERFORM SWAP-RECORD
+               END-IF
+             END-PERFORM
            END-PERFORM
+       .
+
+      *    *************************************************************
+      *
+      *    Swap the records around using a temporary table.
+      *
+      *    *************************************************************
+
+       SWAP-RECORD.
+           MOVE SHOPPING-CART-TABLE-INDEXED(I) TO TEMP-CART
+           MOVE SHOPPING-CART-TABLE-INDEXED(J) TO
+                SHOPPING-CART-TABLE-INDEXED(I)
+           MOVE TEMP-CART TO SHOPPING-CART-TABLE-INDEXED(J)
+       .
+
+      *    *************************************************************
+      *
+      *    Generate shipping report
+      *
+      *    *************************************************************
+
+       GENERATE-SHIPPING-REPORT.
+           MOVE 1 TO SCR-IDXC
+           MOVE "N" TO WS-FOUND
+           SET SHIP-REP TO TRUE
+
+           PERFORM VARYING SCT-IDX FROM 1 BY 1
+                   UNTIL SCT-IDX EQUAL SCT-IDXC
+             PERFORM VARYING SCR-IDX FROM 1 BY 1 
+                     UNTIL SCR-IDX EQUAL SCR-IDXC
+               IF SCRI-CODE(SCR-IDX) EQUAL SCT-CODE(SCT-IDX) THEN
+                 COMPUTE WS-REPORT-Q = SCRI-QUANTITY(SCR-IDX) +
+                                       SCT-QUANTITY(SCT-IDX)
+                 COMPUTE WS-REPORT-C = SCRI-COST(SCR-IDX) +
+                                       SCT-COST(SCT-IDX)
+                 MOVE WS-REPORT-Q TO SCRI-QUANTITY(SCR-IDX)
+                 MOVE WS-REPORT-C TO SCRI-COST(SCR-IDX)
+
+                 MOVE "Y" TO WS-FOUND
+                 EXIT PERFORM
+               END-IF
+             END-PERFORM
+
+             IF WS-FOUND EQUAL "N" THEN
+               MOVE SCT-CODE(SCT-IDX) TO SCRI-CODE(SCR-IDX)
+               MOVE SCT-PRODUCT(SCT-IDX) TO SCRI-PRODUCT(SCR-IDX)
+               MOVE SCT-PRICE(SCT-IDX) TO SCRI-PRICE(SCR-IDX)
+               MOVE SCT-QUANTITY(SCT-IDX) TO SCRI-QUANTITY(SCR-IDX)
+               MOVE SCT-COST(SCT-IDX) TO SCRI-COST(SCR-IDX)
+               ADD 1 TO SCR-IDXC
+             END-IF
+             MOVE "N" TO WS-FOUND
+           END-PERFORM
+       .
+
+      *    *************************************************************
+      *
+      *    Write the shipping report to file
+      *
+      *    *************************************************************
+
+       WRITE-SHIPPING-REPORT.
+           OPEN OUTPUT SHIP-REPORT-FILE.
+             MOVE "Y" TO WS-TORU
+             PERFORM SETUP-REPORT-HEADERS
+             WRITE SHIP-REPORT-HEADER FROM SHIPPING-REPORT-HEADER
+
+             MOVE "N" TO WS-TORU
+             PERFORM SETUP-REPORT-HEADERS
+             WRITE SHIP-REPORT-HEADER FROM SHIPPING-REPORT-HEADER
+
+             PERFORM VARYING SCR-IDX FROM 1 BY 1 
+                     UNTIL SCR-IDX EQUAL SCR-IDXC
+               MOVE SCRI-CODE(SCR-IDX) TO SCRD-CODE
+               MOVE SCRI-PRODUCT(SCR-IDX) TO SCRD-PRODUCT
+               MOVE SCRI-PRICE(SCR-IDX) TO SCRD-PRICE
+               MOVE SCRI-QUANTITY(SCR-IDX) TO SCRD-QUANTITY
+               MOVE SCRI-COST(SCR-IDX) TO SCRD-COST
+
+               WRITE SHIP-REPORT-RECORD FROM SHIPPING-REPORT-DISPLAY
+             END-PERFORM
+           CLOSE SHIP-REPORT-FILE
        .
 
        WRITE-ERROR-REPORT.
@@ -512,541 +1034,3 @@
 
            CLOSE ERROR-REPORT-FILE
        .
-
-       QUERY-WRITE-DATASETS.
-           PERFORM PROCESS-SHOPPING-CART
-           PERFORM WRITE-CONSOLIDATED-DATA
-           PERFORM SORT-TABLE
-           PERFORM GENERATE-SHIPPING-REPORT
-           PERFORM WRITE-SHIPPING-REPORT
-           PERFORM WRITE-ERROR-REPORT
-       .
-      *    *************************************************************
-      *
-      *    Consolidate the data into the data
-      *    Increment the index
-      *    Check how many records have been recorded so far and notify
-      *    the user if closing in on the WS-MAX.
-      *
-      *    *************************************************************
-
-      *    Consolidate the indexed table
-       CONSOLIDATE-DATA-TO-TABLE-INDEXED.
-           MOVE WS-MEMBER-RESP TO SCTI-MEMBER(SCT-IDX)
-           MOVE WS-PRODUCT-CODE TO SCTI-CODE(SCT-IDX) 
-           MOVE WS-PRODUCT-DESC TO SCTI-PRODUCT(SCT-IDX)
-           MOVE WS-PRODUCT-PRICE TO SCTI-PRICE(SCT-IDX)
-           MOVE WS-QUANT-NUM TO SCTI-QUANTITY(SCT-IDX)
-           MOVE WS-DELIVERY TO SCTI-METHOD(SCT-IDX)
-           MOVE WS-SHIP-FEE TO SCTI-FEE(SCT-IDX)
-           MOVE WS-COST TO SCTI-COST(SCT-IDX)
-           
-           SET SCT-IDX UP BY 1
-           MOVE SCT-IDX TO SCT-IDXC
-
-      *    Display a warning message at 9000 records
-           IF SCT-IDXC EQUAL 9000 THEN
-             DISPLAY "*** WARNING: " SCT-IDXC 
-                     " RECORDS OF " WS-MAX " ***"
-           END-IF
-       .
-      
-      *    *************************************************************
-      *
-      *    Display the consolidated data
-      *
-      *    *************************************************************
-       
-       SETUP-HEADERS.
-           MOVE WS-DASH TO SCTH-MEMBER-U
-           MOVE WS-DASH TO SCTH-CODE-U
-           MOVE WS-DASH TO SCTH-PRODUCT-U
-           MOVE WS-DASH TO SCTH-PRICE-U
-           MOVE WS-DASH TO SCTH-QUANTITY-U
-           MOVE WS-DASH TO SCTH-METHOD-U
-           MOVE WS-DASH TO SCTH-FEE-U
-           MOVE WS-DASH TO SCTH-COST-U
-       .
-
-       DISPLAY-SHOPPING-CART-HEADERS.
-      *    MOVE WS-DASH TO SCTH-MEMBER-U
-      *    MOVE WS-DASH TO SCTH-CODE-U
-      *    MOVE WS-DASH TO SCTH-PRODUCT-U
-      *    MOVE WS-DASH TO SCTH-PRICE-U
-      *    MOVE WS-DASH TO SCTH-QUANTITY-U
-      *    MOVE WS-DASH TO SCTH-METHOD-U
-      *    MOVE WS-DASH TO SCTH-FEE-U
-      *    MOVE WS-DASH TO SCTH-COST-U
-           PERFORM SETUP-HEADERS
-           
-           DISPLAY SCTH-MEMBER WS-GAP
-                     SCTH-CODE WS-GAP
-                     SCTH-PRODUCT WS-GAP
-                     SCTH-PRICE WS-GAP
-                     SCTH-QUANTITY WS-GAP
-                     SCTH-METHOD WS-GAP
-                     SCTH-FEE WS-GAP
-                     SCTH-COST
-
-           DISPLAY SCTH-MEMBER-U WS-GAP
-                     SCTH-CODE-U WS-GAP
-                     SCTH-PRODUCT-U WS-GAP
-                     SCTH-PRICE-U WS-GAP
-                     SCTH-QUANTITY-U WS-GAP
-                     SCTH-METHOD-U WS-GAP
-                     SCTH-FEE-U WS-GAP
-                     SCTH-COST-U
-       .
-       
-      * Display the indexed table
-       DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
-           MOVE 0 TO WS-TOTAL-COST
-                
-           PERFORM DISPLAY-SHOPPING-CART-HEADERS
-
-           PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX 
-                   EQUAL SCT-IDXC
-             MOVE SCTI-MEMBER(SCT-IDX)   TO SCTD-MEMBER
-             MOVE SCTI-CODE(SCT-IDX)     TO SCTD-CODE
-             MOVE SCTI-PRODUCT(SCT-IDX)  TO SCTD-PRODUCT
-             MOVE SCTI-PRICE(SCT-IDX)    TO SCTD-PRICE
-             MOVE SCTI-QUANTITY(SCT-IDX) TO SCTD-QUANTITY
-             MOVE SCTI-METHOD(SCT-IDX)   TO SCTD-METHOD
-             MOVE SCTI-FEE(SCT-IDX)      TO SCTD-FEE
-             MOVE SCTI-COST(SCT-IDX)     TO SCTD-COST
-             COMPUTE WS-TOTAL-COST = WS-TOTAL-COST + SCTI-COST(SCT-IDX)
-
-             DISPLAY SCTD-MEMBER WS-GAP
-                     SCTD-CODE WS-GAP
-                     SCTD-PRODUCT WS-GAP
-                     SCTD-PRICE WS-GAP
-                     SCTD-QUANTITY WS-GAP
-                     SCTD-METHOD WS-GAP
-                     SCTD-FEE WS-GAP
-                     SCTD-COST
-           END-PERFORM
-           
-           DISPLAY " "
-           MOVE WS-TOTAL-COST TO SCTD-TOTAL
-           DISPLAY "TOTAL: $" SCTD-TOTAL
-           .
-
-      *    *************************************************************
-      *
-      *    Write the shopping cart to a file
-      *
-      *    ************************************************************* 
-       WRITE-CONSOLIDATED-DATA.
-           MOVE 0 TO WS-TOTAL-COST
-           PERFORM SETUP-HEADERS
-
-           OPEN OUTPUT SHOPCART-REPORT-FILE
-             WRITE SHOPCART-HEADERS FROM SHOPPING-CART-TABLE-HEADERS
-             WRITE SHOPCART-HEADERS FROM SHOPPING-CART-TABLE-U-LINE
-             PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX
-                     EQUAL SCT-IDXC
-               MOVE SCTI-MEMBER(SCT-IDX)   TO SCTD-MEMBER
-               MOVE SCTI-CODE(SCT-IDX)     TO SCTD-CODE
-               MOVE SCTI-PRODUCT(SCT-IDX)  TO SCTD-PRODUCT
-               MOVE SCTI-PRICE(SCT-IDX)    TO SCTD-PRICE
-               MOVE SCTI-QUANTITY(SCT-IDX) TO SCTD-QUANTITY
-               MOVE SCTI-METHOD(SCT-IDX)   TO SCTD-METHOD
-               MOVE SCTI-FEE(SCT-IDX)      TO SCTD-FEE
-               MOVE SCTI-COST(SCT-IDX)     TO SCTD-COST
-               COMPUTE WS-TOTAL-COST = WS-TOTAL-COST + 
-                                       SCTI-COST(SCT-IDX)
-               
-               WRITE SHOPCART-REPORT FROM SHOPPING-CART-TABLE-DISPLAY
-             END-PERFORM
-             
-             MOVE WS-TOTAL-COST TO SCTD-TOTAL
-             WRITE SHOPCART-REPORT-TOTAL FROM 
-                   SHOPPING-CART-TOTAL-DISPLAY
-                   AFTER ADVANCING 1 LINE
-           CLOSE SHOPCART-REPORT-FILE
-
-       .
-      *    *************************************************************
-      *
-      *    Generate the shipping and dispatch reports
-      *
-      *    *************************************************************
-
-      *    Generate the shipping report
-       GENERATE-SHIPPING-REPORT.
-           MOVE 1 TO SCR-IDXC
-           MOVE "N" TO WS-FOUND
-
-           PERFORM VARYING SCT-IDX FROM 1 BY 1
-                   UNTIL SCT-IDX EQUAL SCT-IDXC
-             PERFORM VARYING SCR-IDX FROM 1 BY 1 
-                     UNTIL SCR-IDX EQUAL SCR-IDXC
-               IF SCRI-CODE(SCR-IDX) EQUAL SCTI-CODE(SCT-IDX) THEN
-                 COMPUTE WS-REPORT-Q = SCRI-QUANTITY(SCR-IDX) +
-                                       SCTI-QUANTITY(SCT-IDX)
-                 COMPUTE WS-REPORT-C = SCRI-COST(SCR-IDX) +
-                                       SCTI-COST(SCT-IDX)
-                 MOVE WS-REPORT-Q TO SCRI-QUANTITY(SCR-IDX)
-                 MOVE WS-REPORT-C TO SCRI-COST(SCR-IDX)
-
-                 MOVE "Y" TO WS-FOUND
-                 EXIT PERFORM
-               END-IF
-             END-PERFORM
-
-             IF WS-FOUND EQUAL "N" THEN
-               MOVE SCTI-CODE(SCT-IDX) TO SCRI-CODE(SCR-IDX)
-               MOVE SCTI-PRODUCT(SCT-IDX) TO SCRI-PRODUCT(SCR-IDX)
-               MOVE SCTI-PRICE(SCT-IDX) TO SCRI-PRICE(SCR-IDX)
-               MOVE SCTI-QUANTITY(SCT-IDX) TO SCRI-QUANTITY(SCR-IDX)
-               MOVE SCTI-COST(SCT-IDX) TO SCRI-COST(SCR-IDX)
-               ADD 1 TO SCR-IDXC
-             END-IF
-             MOVE "N" TO WS-FOUND
-           END-PERFORM
-       .
-
-      *    Original code, but modified by Copilot
-       GENERATE-SHIPPING-REPORT-ORG.
-           MOVE 1 TO SCR-IDXC
-
-           PERFORM VARYING SCT-IDX FROM 1 BY 1 
-                   UNTIL SCT-IDX EQUAL SCT-IDXC
-             MOVE "N" TO WS-FOUND
-             
-             PERFORM VARYING SCR-IDX FROM 1 BY 1 
-                     UNTIL SCR-IDX EQUAL SCR-IDXC
-                     OR WS-FOUND EQUAL "Y"
-             
-               IF SCRI-CODE(SCR-IDX) EQUAL SCTI-CODE(SCT-IDX) THEN
-                 COMPUTE SCRI-QUANTITY(SCR-IDX) =
-                         SCRI-QUANTITY(SCR-IDX) + SCTI-QUANTITY(SCT-IDX)
-                 COMPUTE SCRI-COST(SCR-IDX) = 
-                         SCRI-COST(SCR-IDX) + SCTI-COST(SCT-IDX)
-                 MOVE "Y" TO WS-FOUND
-               END-IF
-             END-PERFORM
-
-             IF WS-FOUND EQUAL "N" THEN
-               MOVE SCTI-CODE(SCT-IDX) TO SCRI-CODE(SCR-IDX)
-               MOVE SCTI-PRODUCT(SCT-IDX) TO SCRI-PRODUCT(SCR-IDX)
-               MOVE SCTI-PRICE(SCT-IDX) TO SCRI-PRICE(SCR-IDX)
-               MOVE SCTI-QUANTITY(SCT-IDX) TO SCRI-QUANTITY(SCR-IDX)
-               MOVE SCTI-COST(SCT-IDX) TO SCRI-COST(SCR-IDX)
-               ADD 1 TO SCR-IDXC
-             END-IF
-           END-PERFORM.
-       
-       SETUP-SHIPPING-HEADERS.
-           MOVE WS-DASH TO SCTH-MEMBER-U
-           MOVE WS-DASH TO SCTH-CODE-U
-           MOVE WS-DASH TO SCTH-PRODUCT-U
-           MOVE WS-DASH TO SCTH-PRICE-U
-           MOVE WS-DASH TO SCTH-QUANTITY-U
-           MOVE WS-DASH TO SCTH-METHOD-U
-           MOVE WS-DASH TO SCTH-FEE-U
-           MOVE WS-DASH TO SCTH-COST-U
-
-           MOVE WS-DASH TO SCRH-CODE-U
-           MOVE WS-DASH TO SCRH-PRODUCT-U
-           MOVE WS-DASH TO SCRH-PRICE-U
-           MOVE WS-DASH TO SCRH-QUANTITY-U
-           MOVE WS-DASH TO SCRH-COST-U
-       .
-
-       DISPLAY-SHIPPING-REPORT-HEADERS.
-      *    MOVE WS-DASH TO SCTH-MEMBER-U
-      *    MOVE WS-DASH TO SCTH-CODE-U
-      *    MOVE WS-DASH TO SCTH-PRODUCT-U
-      *    MOVE WS-DASH TO SCTH-PRICE-U
-      *    MOVE WS-DASH TO SCTH-QUANTITY-U
-      *    MOVE WS-DASH TO SCTH-METHOD-U
-      *    MOVE WS-DASH TO SCTH-FEE-U
-      *    MOVE WS-DASH TO SCTH-COST-U
-           PERFORM SETUP-SHIPPING-HEADERS
-           
-           DISPLAY SCTH-CODE WS-GAP
-                   SCTH-PRODUCT WS-GAP
-                   SCTH-PRICE WS-GAP
-                   SCTH-QUANTITY WS-GAP
-                   SCTH-COST
-
-           DISPLAY SCTH-CODE-U WS-GAP
-                   SCTH-PRODUCT-U WS-GAP
-                   SCTH-PRICE-U WS-GAP
-                   SCTH-QUANTITY-U WS-GAP
-                   SCTH-COST-U
-       .
-      
-      *    Display the shipping and dispatch report
-       DISPLAY-SHIPPING-REPORT.
-           SET SCR-IDX TO 1
-           
-           PERFORM DISPLAY-SHIPPING-REPORT-HEADERS
-
-           PERFORM VARYING SCR-IDX FROM 1 BY 1 
-                                           UNTIL SCR-IDX EQUAL SCR-IDXC
-             MOVE SCRI-CODE(SCR-IDX) TO SCRD-CODE
-             MOVE SCRI-PRODUCT(SCR-IDX) TO SCRD-PRODUCT
-             MOVE SCRI-PRICE(SCR-IDX) TO SCRD-PRICE
-             MOVE SCRI-QUANTITY(SCR-IDX) TO SCRD-QUANTITY
-             MOVE SCRI-COST(SCR-IDX) TO SCRD-COST
-
-             DISPLAY SCRD-CODE WS-GAP
-                     SCRD-PRODUCT WS-GAP
-                     SCRD-PRICE WS-GAP
-                     SCRD-QUANTITY WS-GAP
-                     SCRD-COST
-           END-PERFORM
-       .
-
-       WRITE-SHIPPING-REPORT.
-           SET SCR-IDX TO 1
-           PERFORM SETUP-SHIPPING-HEADERS
-
-           OPEN OUTPUT SHIP-REPORT-FILE.
-             WRITE SHIP-REPORT-HEADER FROM SHOPPING-CART-REPORT-HEADER
-             WRITE SHIP-REPORT-HEADER FROM SHOPPING-CART-REPORT-U-LINE
-
-             PERFORM VARYING SCR-IDX FROM 1 BY 1 
-                                           UNTIL SCR-IDX EQUAL SCR-IDXC
-               MOVE SCRI-CODE(SCR-IDX) TO SCRD-CODE
-               MOVE SCRI-PRODUCT(SCR-IDX) TO SCRD-PRODUCT
-               MOVE SCRI-PRICE(SCR-IDX) TO SCRD-PRICE
-               MOVE SCRI-QUANTITY(SCR-IDX) TO SCRD-QUANTITY
-               MOVE SCRI-COST(SCR-IDX) TO SCRD-COST
-
-               WRITE SHIP-REPORT-RECORD FROM 
-                     SHOPPING-CART-REPORT-DISPLAY
-               
-             END-PERFORM
-           CLOSE SHIP-REPORT-FILE
-       .
-      *    *************************************************************
-      *
-      *    Build the product catalogue database from the product list and
-      *    the product price list
-      *
-      *    *************************************************************
-
-       BUILD-CATALOGUE-TABLE.
-           OPEN INPUT CSV-PRODUCT-FILE.
-           SET HWC-IDX TO 1
-           PERFORM UNTIL WS-EOF01 EQUAL 'Y'
-             READ CSV-PRODUCT-FILE
-               AT END MOVE 'Y' TO WS-EOF01
-               NOT AT END
-                 MOVE HWC-IDX TO HWC-IDXC
-                 MOVE HWC-IDXC TO HWC-CODE
-                 MOVE HWC-CODE TO PCT-CODE(HWC-IDX)
-                 UNSTRING CSV-PRODUCT-RECORD
-                   DELIMITED BY ','
-                   INTO 
-                     PCT-PRODUCT(HWC-IDX)
-                     PCT-PRICE(HWC-IDX)
-                 SET HWC-IDX UP BY 1
-             END-READ         
-           END-PERFORM.
-           CLOSE CSV-PRODUCT-FILE
-           MOVE 'N' TO WS-EOF01.
-
-      *    *************************************************************
-      *
-      *    Automate shopping cart processing
-      *
-      *    ************************************************************* 
-
-       PROCESS-SHOPPING-CART.
-           MOVE "N" TO WS-EOF01
-           MOVE "Y" TO WS-SILENT
-           SET ERR-IDX TO 1
-
-           OPEN INPUT CSV-SHOPPING-CART-FILE.
-           PERFORM UNTIL WS-EOF01 EQUAL 'Y'
-             READ CSV-SHOPPING-CART-FILE
-               AT END MOVE 'Y' TO WS-EOF01
-               NOT AT END
-                 UNSTRING CSV-SHOPPING-CART-RECORD
-                   DELIMITED BY "," INTO
-                     WS-MEMBER-RESP
-                     WS-PRODUCT-RESP
-                     WS-QUANT-RESP
-                     WS-DELIVERY
-
-      *    All of this needs to succeed for the next part to proceed
-      *    Any part fails, then it cannot proceed as an invalid choice
-      *    has occurred and need to be addressed.
-                 ADD 1 TO WS-CART-LINE
-                 PERFORM PROCESS-IS-MEMBER
-                 IF WS-RESP-OK EQUAL "Y" THEN
-                   PERFORM PROCESS-PRODUCT-CODE
-                   MOVE 'N' TO WS-DISP-ERR
-                   IF WS-RESP-OK EQUAL "Y" THEN
-                     PERFORM PROCESS-QUANTITY
-                     MOVE 'N' TO WS-DISP-ERR
-                     IF WS-RESP-OK EQUAL "Y" THEN
-                       PERFORM PROCESS-DELIVERY
-                       MOVE 'N' TO WS-DISP-ERR
-                       IF WS-RESP-OK EQUAL "Y" THEN
-                         PERFORM CALCULATE-SHIP-FEE
-                         PERFORM CALCULATE-COST
-                         PERFORM CONSOLIDATE-DATA-TO-TABLE-INDEXED
-                         MOVE 'N' TO WS-DISP-ERR
-                       ELSE
-                         MOVE 'Y' TO WS-DISP-ERR
-                         MOVE "DELIVERY" TO WS-DISP-MSG
-                       END-IF
-                     ELSE
-                       MOVE 'Y' TO WS-DISP-ERR
-                       MOVE "QUANTITY" TO WS-DISP-MSG
-                     END-IF
-                   ELSE
-                     MOVE 'Y' TO WS-DISP-ERR
-                     MOVE "CODE" TO WS-DISP-MSG
-                   END-IF
-                 ELSE
-                   MOVE 'Y' TO WS-DISP-ERR
-                   MOVE "MEMBER" TO WS-DISP-MSG
-                 END-IF
-      *          MOVE 'Y' TO WS-RESP-OK
-                 IF WS-DISP-ERR EQUAL "Y" THEN
-                   ADD 1 TO WS-ERRORS
-                   MOVE WS-CART-LINE TO EL-LINE(ERR-IDX)
-                   MOVE WS-DISP-MSG TO EL-MESSAGE(ERR-IDX)
-                   SET ERR-IDX UP BY 1
-                 END-IF
-             END-READ
-           END-PERFORM
-           CLOSE CSV-SHOPPING-CART-FILE
-           MOVE 'N' TO WS-EOF01
-       .
-
-      *    *************************************************************
-      *
-      *    Display the catalogue formatted in two columns with 
-      *    headers and decorators
-      *
-      *    *************************************************************
-
-       DISPLAY-CATALOGUE.
-           PERFORM DISPLAY-CATALOGUE-HEADERS
-           SET HWC-IDX TO 1
-           MOVE 0 TO WS-COLS
-
-           PERFORM VARYING HWC-IDX FROM 1 BY 1 
-                                   UNTIL HWC-IDX GREATER HWC-IDXC
-             MOVE PCT-CODE(HWC-IDX) TO PCD-CODE
-             MOVE PCT-PRODUCT(HWC-IDX) TO PCD-PRODUCT
-             MOVE PCT-PRICE(HWC-IDX) TO PCD-PRICE
-             IF WS-COLS EQUAL 0 THEN
-               DISPLAY PCD-CODE WS-GAP
-                       PCD-PRODUCT WS-GAP
-                       PCD-PRICE WS-GAP
-                       WITH NO ADVANCING
-             ELSE
-               DISPLAY PCD-CODE WS-GAP
-                       PCD-PRODUCT WS-GAP
-                       PCD-PRICE WS-GAP           
-             END-IF
-             
-             ADD 1 TO WS-COLS
-             IF WS-COLS EQUAL 2 THEN
-               MOVE 0 TO WS-COLS
-             END-IF
-
-           END-PERFORM.
-
-      *    *************************************************************
-      *
-      *    Generate the headers for the product catalogue table
-      *
-      *    *************************************************************
-
-       DISPLAY-CATALOGUE-HEADERS.
-           MOVE 0 TO WS-COLS
-           PERFORM UNTIL WS-COLS EQUAL 2
-             IF WS-COLS EQUAL 0 THEN
-               DISPLAY 
-                 PCH-CODE WS-GAP
-                 PCH-PROD WS-GAP
-                 PCH-PRICE WS-GAP
-                 WITH NO ADVANCING 
-             ELSE
-               DISPLAY
-                 PCH-CODE WS-GAP
-                 PCH-PROD WS-GAP
-                 PCH-PRICE WS-GAP
-             END-IF
-             ADD 1 TO WS-COLS
-           END-PERFORM
-           MOVE 0 TO WS-COLS
-           
-           MOVE WS-DASH TO PCH-CODE-U-LINE
-           MOVE WS-DASH TO PCH-PROD-U-LINE
-           MOVE WS-DASH TO PCH-PRICE-U-LINE
-
-           PERFORM UNTIL WS-COLS EQUAL 2
-             IF WS-COLS EQUAL 0 THEN
-               DISPLAY PCH-CODE-U-LINE WS-GAP
-                       PCH-PROD-U-LINE WS-GAP
-                       PCH-PRICE-U-LINE WS-GAP
-                       WITH NO ADVANCING
-             ELSE
-               DISPLAY PCH-CODE-U-LINE WS-GAP
-                       PCH-PROD-U-LINE WS-GAP
-                       PCH-PRICE-U-LINE WS-GAP
-             END-IF
-             ADD 1 TO WS-COLS
-           END-PERFORM
-           MOVE 0 TO WS-COLS.
-            
-       COPY "MEMBER".
-
-       COPY "PCODE".
-      
-       COPY "QUANTITY".
-
-       COPY "DELIVERY".
-      
-      *    *************************************************************
-      *
-      *    Functions and methods to calculate shipping and costs
-      *
-      *    *************************************************************
-
-      *    Calculate shipping fee based on what delivery method used,
-      *    quantity, and if the base rate is the only factor or if the 
-      *    base and subsequent item fee applies.
-       CALCULATE-SHIP-FEE.
-           MOVE 0 TO WS-SHIP-FEE
-           
-           IF WS-DELIVERY EQUAL WS-DEL THEN
-             IF WS-QUANT-NUM GREATER THAN 1 THEN
-               COMPUTE WS-SHIP-FEE = 2.00 + 
-                       (( WS-QUANT-NUM - 1 ) * 1.60)
-             ELSE
-               MOVE 2.00 TO WS-SHIP-FEE
-             END-IF
-           END-IF.
-
-      *    Calculate the cost using the above shipping fee added to the
-      *    quantity multiplied by the price.  Then if the customer is a
-      *    member, apply a discount.
-       CALCULATE-COST.
-           MOVE 0 TO WS-COST
-
-           COMPUTE WS-COST = (WS-QUANT-NUM * WS-PRODUCT-PRICE) + 
-                              WS-SHIP-FEE
-
-           IF WS-MEMBER-RESP EQUAL "YES" THEN
-             COMPUTE WS-COST = WS-COST * (90 / 100)
-           END-IF.
-       
-       COPY "SORTCODE".
-             
-       COPY "CPSORT".
-
-      
-       
-
-       
