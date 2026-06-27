@@ -1,0 +1,1702 @@
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0001
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000001         IDENTIFICATION DIVISION.
+000002         PROGRAM-ID. SHOP-CART.
+000003         AUTHOR "Wayne Jackson".
+warning: AUTHOR is obsolete in GnuCOBOL
+000004
+000005         ENVIRONMENT DIVISION.
+000006         INPUT-OUTPUT SECTION.
+000007        * Define the file name and set it as a sequential file with each
+000008        * line being beneath the previous.
+000009         FILE-CONTROL.
+000010             SELECT CSV-PRODUCT-FILE
+000011               ASSIGN TO "product.csv"
+000012               ORGANIZATION IS LINE SEQUENTIAL.
+000013
+000014             SELECT CSV-SHOPPING-CART-FILE
+000015               ASSIGN TO "shop-cart.csv"
+000016               ORGANIZATION IS LINE SEQUENTIAL.
+000017
+000018             SELECT SHOPCART-REPORT-FILE
+000019               ASSIGN TO "shopcart.dat"
+000020               ORGANIZATION IS LINE SEQUENTIAL.
+000021
+000022             SELECT SHIP-REPORT-FILE
+000023               ASSIGN TO "shipping.dat"
+000024               ORGANIZATION IS LINE SEQUENTIAL.
+000025
+000026             SELECT ERROR-REPORT-FILE
+000027               ASSIGN TO "error.dat"
+000028               ORGANIZATION IS LINE SEQUENTIAL.
+000029
+000030         DATA DIVISION.
+000031        *    *************************************************************
+000032        *
+000033        *    Variables and other related items for files
+000034        *
+000035        *    *************************************************************
+000036
+000037         FILE SECTION.
+000038        * File descriptor for CSV file
+000039         FD  CSV-PRODUCT-FILE.
+000040        * Each line should be no longer that 80 characters long
+000041         01 CSV-PRODUCT-RECORD PIC X(80).
+000042
+000043        * File descriptor for shop order CSV file
+000044         FD  CSV-SHOPPING-CART-FILE.
+000045        * Each line should be no longer that 80 characters long
+000046         01  CSV-SHOPPING-CART-RECORD PIC X(80).
+000047
+000048         FD  SHOPCART-REPORT-FILE.
+000049         01  SHOPCART-HEADERS.
+000050             05 SCH-MEMBER    PIC X(10).
+000051             05 FILLER        PIC X(4).
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0002
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000052             05 SCH-CODE      PIC X(4).
+000053             05 FILLER        PIC X(4).
+000054             05 SCH-PRODUCT   PIC X(35).
+000055             05 FILLER        PIC X(4).
+000056             05 SCH-PRICE     PIC X(8).
+000057             05 FILLER        PIC X(4).
+000058             05 SCH-QUANTITY  PIC X(8).
+000059             05 FILLER        PIC X(4).
+000060             05 SCH-METHOD    PIC X(15).
+000061             05 FILLER        PIC X(4).
+000062             05 SCH-FEE       PIC X(12).
+000063             05 FILLER         PIC X(4).
+000064             05 SCH-COST      PIC X(8).
+000065
+000066         01  SHOPCART-REPORT.
+000067             05 SCR-MEMBER    PIC X(10).
+000068             05 FILLER        PIC X(4).
+000069             05 SCR-CODE      PIC Z(4).
+000070             05 FILLER        PIC X(4).
+000071             05 SCR-PRODUCT   PIC X(35).
+000072             05 FILLER        PIC X(4).
+000073             05 SCR-PRICE     PIC Z(5).99.
+000074             05 FILLER        PIC X(4).
+000075             05 SCR-QUANTITY  PIC Z(8).
+000076             05 FILLER        PIC X(4).
+000077             05 SCR-METHOD    PIC X(15).
+000078             05 FILLER        PIC X(4).
+000079             05 SCR-FEE       PIC Z(9).99.
+000080             05 FILLER        PIC X(4).
+000081             05 SCR-COST      PIC Z(5).99.
+000082             05 FILLER        PIC X(4).
+000083
+000084         01  SHOPCART-REPORT-TOTAL.
+000085             05 FILLER         PIC X(8) VALUE "TOTAL $ ".
+000086             05 SCR-TOTAL     PIC Z(5).99.
+000087
+000088         FD  SHIP-REPORT-FILE.
+000089         01  SHIP-REPORT-HEADER.
+000090             05 SRH-CODE      PIC X(4).
+000091             05 FILLER        PIC X(4).
+000092             05 SRH-PRODUCT   PIC X(35).
+000093             05 FILLER        PIC X(4).
+000094             05 SRH-PRICE     PIC X(8).
+000095             05 FILLER        PIC X(4).
+000096             05 SRH-QUANTITY  PIC X(8).
+000097             05 FILLER        PIC X(4).
+000098             05 SRH-COST      PIC X(8).
+000099
+000100         01  SHIP-REPORT-RECORD.
+000101             05 SRR-CODE      PIC X(4).
+000102             05 FILLER        PIC X(4).
+000103             05 SRR-PRODUCT   PIC X(35).
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0003
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000104             05 FILLER        PIC X(4).
+000105             05 SRR-PRICE     PIC X(8).
+000106             05 FILLER        PIC X(4).
+000107             05 SRR-QUANTITY  PIC X(8).
+000108             05 FILLER        PIC X(4).
+000109             05 SRR-COST      PIC X(8).
+000110
+000111         FD  ERROR-REPORT-FILE.
+000112         01  ERROR-REPORT-RECORD.
+000113             05 ERR-MESSAGE  PIC X(80).
+000114             05 FILLER       PIC X(4).
+000115             05 ERR-LINE     PIC Z(9).
+000116        *    *************************************************************
+000117        *
+000118        *    Working storage variables
+000119        *
+000120        *    *************************************************************
+000121
+000122         WORKING-STORAGE SECTION.
+000123        *    *************************************************************
+000124        *
+000125        *    END OF FILE marker(s)
+000126        *
+000127        *    *************************************************************
+000128         01  WS-EOF01    PIC X(1) VALUE 'N'.
+000129         01  WS-EOF02    PIC X(1) VALUE 'N'.
+000130         COPY 'SORTWORK'.
+000001C       *    *************************************************************
+000002C       *
+000003C       *    Required loop variables for the bubble sort algorithm
+000004C       *
+000005C       *    *************************************************************
+000006C
+000007C       *    Variables for Bubble sort
+000008C        01  I           PIC 9(4) VALUE 0.
+000009C        01  J           PIC 9(4) VALUE 0.
+000131        *    *************************************************************
+000132        *
+000133        *    Constants and other such shenanigans.
+000134        *
+000135        *    *************************************************************
+000136
+000137        *    Gap between headers and columns
+000138         01  WS-GAP      PIC X(4) VALUE SPACES.
+000139        *    Debug gap to check if the gap is looking right
+000140        *01  WS-GAP      PIC X(4) VALUE "....".
+000141        *    Variable to track the columns
+000142         01  WS-COLS     PIC 9.
+000143        *    Max table depth
+000144         01  WS-MAX      PIC 9(4) VALUE 9999.
+000145        *    Underline dashes set to 40 characters long
+000146         01  WS-DASH     PIC X(40) VALUE
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0004
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000147             "----------------------------------------".
+000148
+000149        *    So I do not have to type over and over and over again
+000150         01  WS-DELIVERY-METHODS.
+000151             05 WS-DEL   PIC X(8) VALUE "DELIVERY".
+000152             05 WS-PU    PIC X(7) VALUE "PICK-UP".
+000153
+000154        *    *************************************************************
+000155        *
+000156        *    Required variables
+000157        *
+000158        *    *************************************************************
+000159         01  WS-REQUIRED-VARIABLES.
+000160        *    Used to track what line errors occurred in the source cart
+000161             05 WS-CART-LINE      PIC 9(7)    VALUE 0.
+000162        *    Boolean variable to track if to display an error message
+000163             05 WS-DISP-ERR       PIC X(1)    VALUE "N".
+000164        *    Buffer for the error message
+000165             05 WS-DISP-MSG       PIC X(15)   VALUE SPACES.
+000166        *    Boolean variable to determine if the response is OK or not
+000167             05 WS-RESP-OK        PIC X(1)    VALUE 'N'.
+000168        *    Boolean to determine if silent operation
+000169             05 WS-SILENT         PIC X(1)    VALUE 'N'.
+000170        *    Member YES/NO/END
+000171             05 WS-MEMBER-RESP    PIC X(3)    VALUE SPACES.
+000172        *    Product Code as string
+000173             05 WS-PRODUCT-RESP   PIC X(2)    VALUE SPACES.
+000174        *    Product code as number
+000175             05 WS-PRODUCT-NUM    PIC 9(2)    VALUE 0.
+000176        *    Formatted product code
+000177             05 WS-PRODUCT-CODE   PIC 9(4)    VALUE 0.
+000178        *    Product description
+000179             05 WS-PRODUCT-DESC   PIC X(35)   VALUE SPACES.
+000180        *    Formatted product price
+000181             05 WS-PRODUCT-PRICE  PIC 9(5)V99 VALUE 0.
+000182        *    Quantity as string
+000183             05 WS-QUANT-RESP     PIC X(2)    VALUE SPACES.
+000184        *    Quantity as number
+000185             05 WS-QUANT-NUM      PIC 9(2)    VALUE 0.
+000186        *    DELIVERY/PICK-UP
+000187             05 WS-DELIVERY       PIC X(15)   VALUE SPACES.
+000188        *    Numerical indicator for DELIVERY/PICK-UP 1 OR 2
+000189             05 WS-DELIVERY-NUM   PIC 9       VALUE 0.
+000190        *    Calculated shipping fee formatted
+000191             05 WS-SHIP-FEE       PIC 9(5)V99 VALUE 0.
+000192        *    Calculated cost formatted
+000193             05 WS-COST           PIC 9(5)V99 VALUE 0.
+000194        *    Calculated total cost formatted
+000195             05 WS-TOTAL-COST     PIC 9(5)V99 VALUE 0.
+000196        *    Used for the report generation to indicate if a record has
+000197        *    been found
+000198             05 WS-FOUND          PIC X(1)    VALUE 'N'.
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0005
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000199        *    Calculated quantity
+000200             05 WS-REPORT-Q       PIC 9(4).
+000201        *    Calculated cost
+000202             05 WS-REPORT-C       PIC 9(5)V99.
+000203        *    Total errors detected
+000204             05 WS-ERRORS         PIC 9(4)    VALUE 0.
+000205        *    Query if the program is to run interactively or note
+000206             05 WS-INTERACT-RESP  PIC X(1)    VALUE SPACE.
+000207
+000208
+000209        *    *************************************************************
+000210        *
+000211        *    Homeware City Storage variables
+000212        *
+000213        *    *************************************************************
+000214         01  HOMEWARECITY-STORAGE.
+000215        *    Manual indexing of the product table
+000216             05 HWC-IDXC   PIC 9(4).
+000217        *    Manual calculation of the product code
+000218             05 HWC-CODE   PIC 9(2).
+000219        *    Shopping cart table index manual method
+000220             05 SCT-INDEX  PIC 9(10).
+000221        *    Count of the table for the shopping cart
+000222             05 SCT-COUNT  PIC 9(10).
+000223        *    Index counter for Shopping Cart Table
+000224             05 SCT-IDXC   PIC 9(4).
+000225        *    Index counter for Shopping Cart Report
+000226             05 SCR-IDXC   PIC 9(4).
+000227        *    Total for the Shopping Cart Table to be displayed
+000228        *    05 SCTD-TOTAL     PIC Z(5).99.
+000229
+000230        *    *************************************************************
+000231        *
+000232        *    Data structures for the tables
+000233        *
+000234        *    *************************************************************
+000235
+000236             05 ERROR-LOG OCCURS 9999 TIMES INDEXED BY ERR-IDX.
+000237               10 EL-MESSAGE          PIC X(80).
+000238               10 FILLER              PIC X(4).
+000239               10 EL-LINE             PIC 9(7).
+000240
+000241             05 ERROR-LOG-DISPLAY.
+000242               10 ERD-MESSAGE         PIC X(80).
+000243               10 FILLER              PIC X(4).
+000244               10 ERD-LINE            PIC Z(7).
+000245        *    *************************************************************
+000246        *
+000247        *    Product Catalogue Table Data structures
+000248        *
+000249        *    *************************************************************
+000250
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0006
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000251        *    Structure for Product catalogue table
+000252             05 PRODUCT-CATALOGUE-TABLE OCCURS 40 TIMES
+000253                                        INDEXED BY HWC-IDX.
+000254               10 PCT-CODE            PIC 9(4).
+000255               10 PCT-PRODUCT         PIC X(35).
+000256               10 PCT-PRICE           PIC 9(5)V99.
+000257
+000258        *    Structure for displaying the data structure
+000259             05 PRODUCT-CATALOGUE-DISPLAY.
+000260               10 PCD-CODE            PIC Z(4).
+000261               10 PCD-PRODUCT         PIC X(35).
+000262               10 PCD-PRICE           PIC Z(5).99.
+000263
+000264        *    Structure for the headers
+000265             05 PRODUCT-CATALOGUE-HEADERS.
+000266               10 PCH-CODE    PIC X(4)    VALUE "CODE".
+000267               10 PCH-PROD    PIC X(35)   VALUE "PRODUCT NAME".
+000268               10 PCH-PRICE   PIC X(8)    VALUE "$  PRICE".
+000269               10 PCH-CODE-U-LINE  PIC X(4).
+000270               10 PCH-PROD-U-LINE  PIC X(35).
+000271               10 PCH-PRICE-U-LINE PIC X(8).
+000272
+000273        *    *************************************************************
+000274        *
+000275        *    Shopping Cart Table Data structures
+000276        *
+000277        *    *************************************************************
+000278
+000279        *    Structure of table shopping cart
+000280             05 SHOPPING-CART-TABLE-INDEXED OCCURS 9999 TIMES
+000281                 ASCENDING KEY IS SCTI-CODE
+000282                 INDEXED BY SCT-IDX.
+000283               10 SCTI-MEMBER    PIC X(3).
+000284               10 SCTI-CODE      PIC 9(4).
+000285               10 SCTI-PRODUCT   PIC X(35).
+000286               10 SCTI-PRICE     PIC 9(5)V9(2).
+000287               10 SCTI-QUANTITY  PIC 9(2).
+000288               10 SCTI-METHOD    PIC X(15).
+000289               10 SCTI-FEE       PIC 9(5)V99.
+000290               10 SCTI-COST      PIC 9(5)V99.
+000291
+000292        *    Structure for headers for shopping cart
+000293             05 SHOPPING-CART-TABLE-HEADERS.
+000294               10 SCTH-MEMBER    PIC X(10)    VALUE "MEMBER".
+000295               10 FILLER         PIC X(4).
+000296               10 SCTH-CODE      PIC X(4)     VALUE "CODE".
+000297               10 FILLER         PIC X(4).
+000298               10 SCTH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+000299               10 FILLER         PIC X(4).
+000300               10 SCTH-PRICE     PIC X(8)     VALUE "$  PRICE".
+000301               10 FILLER         PIC X(4).
+000302               10 SCTH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0007
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000303               10 FILLER         PIC X(4).
+000304               10 SCTH-METHOD    PIC X(15)    VALUE "SHIPPING METHOD".
+000305               10 FILLER         PIC X(4).
+000306               10 SCTH-FEE       PIC X(12)    VALUE "SHIPPING FEE".
+000307               10 FILLER         PIC X(4).
+000308               10 SCTH-COST      PIC X(8)     VALUE "$   COST".
+000309
+000310             05 SHOPPING-CART-TABLE-U-LINE.
+000311               10 SCTH-MEMBER-U    PIC X(10).
+000312               10 FILLER           PIC X(4).
+000313               10 SCTH-CODE-U      PIC X(4).
+000314               10 FILLER           PIC X(4).
+000315               10 SCTH-PRODUCT-U   PIC X(35).
+000316               10 FILLER           PIC X(4).
+000317               10 SCTH-PRICE-U     PIC X(8).
+000318               10 FILLER           PIC X(4).
+000319               10 SCTH-QUANTITY-U  PIC X(8).
+000320               10 FILLER           PIC X(4).
+000321               10 SCTH-METHOD-U    PIC X(15).
+000322               10 FILLER           PIC X(4).
+000323               10 SCTH-FEE-U       PIC X(12).
+000324               10 FILLER           PIC X(4).
+000325               10 SCTH-COST-U      PIC X(8).
+000326
+000327        *    Display data structure for shopping cart
+000328             05 SHOPPING-CART-TABLE-DISPLAY.
+000329               10 SCTD-MEMBER    PIC X(10).
+000330               10 FILLER         PIC X(4).
+000331               10 SCTD-CODE      PIC Z(4).
+000332               10 FILLER         PIC X(4).
+000333               10 SCTD-PRODUCT   PIC X(35).
+000334               10 FILLER         PIC X(4).
+000335               10 SCTD-PRICE     PIC Z(5).99.
+000336               10 FILLER         PIC X(4).
+000337               10 SCTD-QUANTITY  PIC Z(8).
+000338               10 FILLER         PIC X(4).
+000339               10 SCTD-METHOD    PIC X(15).
+000340               10 FILLER         PIC X(4).
+000341               10 SCTD-FEE       PIC Z(9).99.
+000342               10 FILLER         PIC X(4).
+000343               10 SCTD-COST      PIC Z(5).99.
+000344
+000345             05 SHOPPING-CART-TOTAL-DISPLAY.
+000346               10 FILLER         PIC X(8) VALUE "TOTAL $ ".
+000347               10 SCTD-TOTAL     PIC Z(5).99.
+000348
+000349        *    Temporary data structure for Bubble sort
+000350             05 TEMP-CART.
+000351               10 FILLER    PIC X(3).
+000352               10 FILLER    PIC 9(4).
+000353               10 FILLER    PIC X(35).
+000354               10 FILLER    PIC 9(5)V9(2).
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0008
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000355               10 FILLER    PIC 9(2).
+000356               10 FILLER    PIC X(15).
+000357               10 FILLER    PIC 9(5)V99.
+000358               10 FILLER    PIC 9(5)V99.
+000359
+000360        *    *************************************************************
+000361        *
+000362        *    Shopping Cart Report Data structures
+000363        *
+000364        *    *************************************************************
+000365
+000366        *    Shopping cart report data structure
+000367             05 SHOPPING-CART-REPORT-INDEX OCCURS 9999 TIMES
+000368                 INDEXED BY SCR-IDX.
+000369               10 SCRI-CODE      PIC 9(4).
+000370               10 SCRI-PRODUCT   PIC X(35).
+000371               10 SCRI-PRICE     PIC 9(5)V99.
+000372               10 SCRI-QUANTITY  PIC 9(4).
+000373               10 SCRI-COST      PIC 9(5)V99.
+000374
+000375             05 SHOPPING-CART-REPORT-DISPLAY.
+000376               10 SCRD-CODE      PIC Z(4).
+000377               10 FILLER         PIC X(4).
+000378               10 SCRD-PRODUCT   PIC X(35).
+000379               10 FILLER         PIC X(4).
+000380               10 SCRD-PRICE     PIC Z(5).99.
+000381               10 FILLER         PIC X(4).
+000382               10 SCRD-QUANTITY  PIC Z(8).
+000383               10 FILLER         PIC X(4).
+000384               10 SCRD-COST      PIC Z(5).99.
+000385
+000386             05 SHOPPING-CART-REPORT-HEADER.
+000387               10 SCRH-CODE      PIC X(4)     VALUE "CODE".
+000388               10 FILLER         PIC X(4).
+000389               10 SCRH-PRODUCT   PIC X(35)    VALUE "PRODUCT".
+000390               10 FILLER         PIC X(4).
+000391               10 SCRH-PRICE     PIC X(8)     VALUE "$  PRICE".
+000392               10 FILLER         PIC X(4).
+000393               10 SCRH-QUANTITY  PIC X(8)     VALUE "QUANTITY".
+000394               10 FILLER         PIC X(4).
+000395               10 SCRH-COST      PIC X(8)     VALUE "$   COST".
+000396
+000397             05 SHOPPING-CART-REPORT-U-LINE.
+000398               10 SCRH-CODE-U      PIC X(4).
+000399               10 FILLER           PIC X(4).
+000400               10 SCRH-PRODUCT-U   PIC X(35).
+000401               10 FILLER           PIC X(4).
+000402               10 SCRH-PRICE-U     PIC X(8).
+000403               10 FILLER           PIC X(4).
+000404               10 SCRH-QUANTITY-U  PIC X(8).
+000405               10 FILLER           PIC X(4).
+000406               10 SCRH-COST-U      PIC X(8).
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0009
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000407
+000408        *    *************************************************************
+000409        *
+000410        *    Main body of code
+000411        *
+000412        *    *************************************************************
+000413
+000414         PROCEDURE DIVISION.
+000415        *    REQUIRED FUNCTION
+000416             PERFORM BUILD-CATALOGUE-TABLE
+000417        *    REQUIRED FUNCTION
+000418
+000419             PERFORM QUERY-WRITE-DATASETS
+000420        *    DISPLAY "IS THIS TO BE RUN INTERACTIVELY OR "
+000421        *            "NON-INTERACTIVELY? (Y/N): "
+000422        *            WITH NO ADVANCING
+000423        *    ACCEPT WS-INTERACT-RESP
+000424        *
+000425        *    EVALUATE TRUE
+000426        *     WHEN WS-INTERACT-RESP = "Y"
+000427        *       PERFORM QUERY-USER-VERSION
+000428        *     WHEN WS-INTERACT-RESP = "N"
+000429        *       PERFORM QUERY-NON-INTERACTIVE-VERSION
+000430        *     WHEN OTHER
+000431        *       DISPLAY "GOOD BYE."
+000432        *    END-EVALUATE
+000433
+000434             STOP RUN.
+000435
+000436        *    *************************************************************
+000437        *
+000438        *    User interactive version of the code
+000439        *
+000440        *    *************************************************************
+000441
+000442         QUERY-USER-VERSION.
+000443        *    Commented out as this need to be done regardless of
+000444        *    automation of manual input
+000445             MOVE 1 TO SCT-INDEX
+000446             SET SCT-IDX TO 1
+000447
+000448             PERFORM UNTIL WS-MEMBER-RESP EQUAL "END"
+000449               PERFORM QUERY-IS-MEMBER
+000450               IF WS-MEMBER-RESP NOT EQUAL "END"
+000451                 PERFORM DISPLAY-CATALOGUE
+000452                 PERFORM QUERY-PRODUCT-CODE
+000453                 PERFORM SEARCH-PRODUCT-CODE
+000454                 PERFORM QUERY-QUANTITY
+000455                 PERFORM QUERY-DELIVERY-METHOD
+000456                 PERFORM CALCULATE-SHIP-FEE
+000457                 PERFORM CALCULATE-COST
+000458
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0010
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000459                 PERFORM CONSOLIDATE-DATA-TO-TABLE-INDEXED
+000460               END-IF
+000461             END-PERFORM.
+000462
+000463             PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
+000464             DISPLAY " ... "
+000465             PERFORM SORT-TABLE
+000466             PERFORM GENERATE-SHIPPING-REPORT
+000467             PERFORM DISPLAY-SHIPPING-REPORT
+000468
+000469             .
+000470
+000471        *    *************************************************************
+000472        *
+000473        *    Non-user interactive version of the code
+000474        *
+000475        *    *************************************************************
+000476         QUERY-NON-INTERACTIVE-VERSION.
+000477             PERFORM PROCESS-SHOPPING-CART
+000478
+000479             DISPLAY " "
+000480             PERFORM DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED
+000481        *    PERFORM WRITE-CONSOLIDATED-DATA
+000482
+000483             DISPLAY " "
+000484
+000485             PERFORM SORT-TABLE
+000486             PERFORM GENERATE-SHIPPING-REPORT
+000487             PERFORM DISPLAY-SHIPPING-REPORT
+000488        *    PERFORM WRITE-SHIPPING-REPORT
+000489
+000490             DISPLAY " "
+000491             DISPLAY "THERE WERE: " WS-ERRORS " ERRORS DETECTED"
+000492
+000493             PERFORM VARYING ERR-IDX FROM 1 BY 1
+000494                                     UNTIL ERR-IDX EQUAL WS-ERRORS
+000495               DISPLAY "ERROR ON LINE: "
+000496                       EL-LINE(ERR-IDX)
+000497                       " ERROR: "
+000498                       EL-MESSAGE(ERR-IDX)
+000499             END-PERFORM
+000500         .
+000501
+000502         WRITE-ERROR-REPORT.
+000503             OPEN OUTPUT ERROR-REPORT-FILE.
+000504
+000505               PERFORM VARYING ERR-IDX FROM 1 BY 1
+000506               UNTIL ERR-IDX EQUAL WS-ERRORS
+000507                 MOVE EL-LINE(ERR-IDX) TO ERD-LINE
+000508                 MOVE EL-MESSAGE(ERR-IDX) TO ERD-MESSAGE
+000509
+000510                 WRITE ERROR-REPORT-RECORD FROM ERROR-LOG-DISPLAY
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0011
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000511               END-PERFORM
+000512
+000513             CLOSE ERROR-REPORT-FILE
+000514         .
+000515
+000516         QUERY-WRITE-DATASETS.
+000517             PERFORM PROCESS-SHOPPING-CART
+000518             PERFORM WRITE-CONSOLIDATED-DATA
+000519             PERFORM SORT-TABLE
+000520             PERFORM GENERATE-SHIPPING-REPORT
+000521             PERFORM WRITE-SHIPPING-REPORT
+000522             PERFORM WRITE-ERROR-REPORT
+000523         .
+000524        *    *************************************************************
+000525        *
+000526        *    Consolidate the data into the data
+000527        *    Increment the index
+000528        *    Check how many records have been recorded so far and notify
+000529        *    the user if closing in on the WS-MAX.
+000530        *
+000531        *    *************************************************************
+000532
+000533        *    Consolidate the indexed table
+000534         CONSOLIDATE-DATA-TO-TABLE-INDEXED.
+000535             MOVE WS-MEMBER-RESP TO SCTI-MEMBER(SCT-IDX)
+000536             MOVE WS-PRODUCT-CODE TO SCTI-CODE(SCT-IDX)
+000537             MOVE WS-PRODUCT-DESC TO SCTI-PRODUCT(SCT-IDX)
+000538             MOVE WS-PRODUCT-PRICE TO SCTI-PRICE(SCT-IDX)
+000539             MOVE WS-QUANT-NUM TO SCTI-QUANTITY(SCT-IDX)
+000540             MOVE WS-DELIVERY TO SCTI-METHOD(SCT-IDX)
+000541             MOVE WS-SHIP-FEE TO SCTI-FEE(SCT-IDX)
+000542             MOVE WS-COST TO SCTI-COST(SCT-IDX)
+000543
+000544             SET SCT-IDX UP BY 1
+000545             MOVE SCT-IDX TO SCT-IDXC
+000546
+000547        *    Display a warning message at 9000 records
+000548             IF SCT-IDXC EQUAL 9000 THEN
+000549               DISPLAY "*** WARNING: " SCT-IDXC
+000550                       " RECORDS OF " WS-MAX " ***"
+000551             END-IF
+000552         .
+000553
+000554        *    *************************************************************
+000555        *
+000556        *    Display the consolidated data
+000557        *
+000558        *    *************************************************************
+000559
+000560         SETUP-HEADERS.
+000561             MOVE WS-DASH TO SCTH-MEMBER-U
+000562             MOVE WS-DASH TO SCTH-CODE-U
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0012
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000563             MOVE WS-DASH TO SCTH-PRODUCT-U
+000564             MOVE WS-DASH TO SCTH-PRICE-U
+000565             MOVE WS-DASH TO SCTH-QUANTITY-U
+000566             MOVE WS-DASH TO SCTH-METHOD-U
+000567             MOVE WS-DASH TO SCTH-FEE-U
+000568             MOVE WS-DASH TO SCTH-COST-U
+000569         .
+000570
+000571         DISPLAY-SHOPPING-CART-HEADERS.
+000572        *    MOVE WS-DASH TO SCTH-MEMBER-U
+000573        *    MOVE WS-DASH TO SCTH-CODE-U
+000574        *    MOVE WS-DASH TO SCTH-PRODUCT-U
+000575        *    MOVE WS-DASH TO SCTH-PRICE-U
+000576        *    MOVE WS-DASH TO SCTH-QUANTITY-U
+000577        *    MOVE WS-DASH TO SCTH-METHOD-U
+000578        *    MOVE WS-DASH TO SCTH-FEE-U
+000579        *    MOVE WS-DASH TO SCTH-COST-U
+000580             PERFORM SETUP-HEADERS
+000581
+000582             DISPLAY SCTH-MEMBER WS-GAP
+000583                       SCTH-CODE WS-GAP
+000584                       SCTH-PRODUCT WS-GAP
+000585                       SCTH-PRICE WS-GAP
+000586                       SCTH-QUANTITY WS-GAP
+000587                       SCTH-METHOD WS-GAP
+000588                       SCTH-FEE WS-GAP
+000589                       SCTH-COST
+000590
+000591             DISPLAY SCTH-MEMBER-U WS-GAP
+000592                       SCTH-CODE-U WS-GAP
+000593                       SCTH-PRODUCT-U WS-GAP
+000594                       SCTH-PRICE-U WS-GAP
+000595                       SCTH-QUANTITY-U WS-GAP
+000596                       SCTH-METHOD-U WS-GAP
+000597                       SCTH-FEE-U WS-GAP
+000598                       SCTH-COST-U
+000599         .
+000600
+000601        * Display the indexed table
+000602         DISPLAY-CONSOLIDATED-DATA-TABLE-INDEXED.
+000603             MOVE 0 TO WS-TOTAL-COST
+000604
+000605             PERFORM DISPLAY-SHOPPING-CART-HEADERS
+000606
+000607             PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX
+000608                     EQUAL SCT-IDXC
+000609               MOVE SCTI-MEMBER(SCT-IDX)   TO SCTD-MEMBER
+000610               MOVE SCTI-CODE(SCT-IDX)     TO SCTD-CODE
+000611               MOVE SCTI-PRODUCT(SCT-IDX)  TO SCTD-PRODUCT
+000612               MOVE SCTI-PRICE(SCT-IDX)    TO SCTD-PRICE
+000613               MOVE SCTI-QUANTITY(SCT-IDX) TO SCTD-QUANTITY
+000614               MOVE SCTI-METHOD(SCT-IDX)   TO SCTD-METHOD
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0013
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000615               MOVE SCTI-FEE(SCT-IDX)      TO SCTD-FEE
+000616               MOVE SCTI-COST(SCT-IDX)     TO SCTD-COST
+000617               COMPUTE WS-TOTAL-COST = WS-TOTAL-COST + SCTI-COST(SCT-IDX)
+000618
+000619               DISPLAY SCTD-MEMBER WS-GAP
+000620                       SCTD-CODE WS-GAP
+000621                       SCTD-PRODUCT WS-GAP
+000622                       SCTD-PRICE WS-GAP
+000623                       SCTD-QUANTITY WS-GAP
+000624                       SCTD-METHOD WS-GAP
+000625                       SCTD-FEE WS-GAP
+000626                       SCTD-COST
+000627             END-PERFORM
+000628
+000629             DISPLAY " "
+000630             MOVE WS-TOTAL-COST TO SCTD-TOTAL
+000631             DISPLAY "TOTAL: $" SCTD-TOTAL
+000632             .
+000633
+000634        *    *************************************************************
+000635        *
+000636        *    Write the shopping cart to a file
+000637        *
+000638        *    *************************************************************
+000639         WRITE-CONSOLIDATED-DATA.
+000640             MOVE 0 TO WS-TOTAL-COST
+000641             PERFORM SETUP-HEADERS
+000642
+000643             OPEN OUTPUT SHOPCART-REPORT-FILE
+000644               WRITE SHOPCART-HEADERS FROM SHOPPING-CART-TABLE-HEADERS
+000645               WRITE SHOPCART-HEADERS FROM SHOPPING-CART-TABLE-U-LINE
+000646               PERFORM VARYING SCT-IDX FROM 1 BY 1 UNTIL SCT-IDX
+000647                       EQUAL SCT-IDXC
+000648                 MOVE SCTI-MEMBER(SCT-IDX)   TO SCTD-MEMBER
+000649                 MOVE SCTI-CODE(SCT-IDX)     TO SCTD-CODE
+000650                 MOVE SCTI-PRODUCT(SCT-IDX)  TO SCTD-PRODUCT
+000651                 MOVE SCTI-PRICE(SCT-IDX)    TO SCTD-PRICE
+000652                 MOVE SCTI-QUANTITY(SCT-IDX) TO SCTD-QUANTITY
+000653                 MOVE SCTI-METHOD(SCT-IDX)   TO SCTD-METHOD
+000654                 MOVE SCTI-FEE(SCT-IDX)      TO SCTD-FEE
+000655                 MOVE SCTI-COST(SCT-IDX)     TO SCTD-COST
+000656                 COMPUTE WS-TOTAL-COST = WS-TOTAL-COST +
+000657                                         SCTI-COST(SCT-IDX)
+000658
+000659                 WRITE SHOPCART-REPORT FROM SHOPPING-CART-TABLE-DISPLAY
+000660               END-PERFORM
+000661
+000662               MOVE WS-TOTAL-COST TO SCTD-TOTAL
+000663               WRITE SHOPCART-REPORT-TOTAL FROM
+000664                     SHOPPING-CART-TOTAL-DISPLAY
+000665                     AFTER ADVANCING 1 LINE
+000666             CLOSE SHOPCART-REPORT-FILE
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0014
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000667
+000668         .
+000669        *    *************************************************************
+000670        *
+000671        *    Generate the shipping and dispatch reports
+000672        *
+000673        *    *************************************************************
+000674
+000675        *    Generate the shipping report
+000676         GENERATE-SHIPPING-REPORT.
+000677             MOVE 1 TO SCR-IDXC
+000678             MOVE "N" TO WS-FOUND
+000679
+000680             PERFORM VARYING SCT-IDX FROM 1 BY 1
+000681                     UNTIL SCT-IDX EQUAL SCT-IDXC
+000682               PERFORM VARYING SCR-IDX FROM 1 BY 1
+000683                       UNTIL SCR-IDX EQUAL SCR-IDXC
+000684                 IF SCRI-CODE(SCR-IDX) EQUAL SCTI-CODE(SCT-IDX) THEN
+000685                   COMPUTE WS-REPORT-Q = SCRI-QUANTITY(SCR-IDX) +
+000686                                         SCTI-QUANTITY(SCT-IDX)
+000687                   COMPUTE WS-REPORT-C = SCRI-COST(SCR-IDX) +
+000688                                         SCTI-COST(SCT-IDX)
+000689                   MOVE WS-REPORT-Q TO SCRI-QUANTITY(SCR-IDX)
+000690                   MOVE WS-REPORT-C TO SCRI-COST(SCR-IDX)
+000691
+000692                   MOVE "Y" TO WS-FOUND
+000693                   EXIT PERFORM
+000694                 END-IF
+000695               END-PERFORM
+000696
+000697               IF WS-FOUND EQUAL "N" THEN
+000698                 MOVE SCTI-CODE(SCT-IDX) TO SCRI-CODE(SCR-IDX)
+000699                 MOVE SCTI-PRODUCT(SCT-IDX) TO SCRI-PRODUCT(SCR-IDX)
+000700                 MOVE SCTI-PRICE(SCT-IDX) TO SCRI-PRICE(SCR-IDX)
+000701                 MOVE SCTI-QUANTITY(SCT-IDX) TO SCRI-QUANTITY(SCR-IDX)
+000702                 MOVE SCTI-COST(SCT-IDX) TO SCRI-COST(SCR-IDX)
+000703                 ADD 1 TO SCR-IDXC
+000704               END-IF
+000705               MOVE "N" TO WS-FOUND
+000706             END-PERFORM
+000707         .
+000708
+000709        *    Original code, but modified by Copilot
+000710         GENERATE-SHIPPING-REPORT-ORG.
+000711             MOVE 1 TO SCR-IDXC
+000712
+000713             PERFORM VARYING SCT-IDX FROM 1 BY 1
+000714                     UNTIL SCT-IDX EQUAL SCT-IDXC
+000715               MOVE "N" TO WS-FOUND
+000716
+000717               PERFORM VARYING SCR-IDX FROM 1 BY 1
+000718                       UNTIL SCR-IDX EQUAL SCR-IDXC
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0015
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000719                       OR WS-FOUND EQUAL "Y"
+000720
+000721                 IF SCRI-CODE(SCR-IDX) EQUAL SCTI-CODE(SCT-IDX) THEN
+000722                   COMPUTE SCRI-QUANTITY(SCR-IDX) =
+000723                           SCRI-QUANTITY(SCR-IDX) + SCTI-QUANTITY(SCT-IDX)
+000724                   COMPUTE SCRI-COST(SCR-IDX) =
+000725                           SCRI-COST(SCR-IDX) + SCTI-COST(SCT-IDX)
+000726                   MOVE "Y" TO WS-FOUND
+000727                 END-IF
+000728               END-PERFORM
+000729
+000730               IF WS-FOUND EQUAL "N" THEN
+000731                 MOVE SCTI-CODE(SCT-IDX) TO SCRI-CODE(SCR-IDX)
+000732                 MOVE SCTI-PRODUCT(SCT-IDX) TO SCRI-PRODUCT(SCR-IDX)
+000733                 MOVE SCTI-PRICE(SCT-IDX) TO SCRI-PRICE(SCR-IDX)
+000734                 MOVE SCTI-QUANTITY(SCT-IDX) TO SCRI-QUANTITY(SCR-IDX)
+000735                 MOVE SCTI-COST(SCT-IDX) TO SCRI-COST(SCR-IDX)
+000736                 ADD 1 TO SCR-IDXC
+000737               END-IF
+000738             END-PERFORM.
+000739
+000740         SETUP-SHIPPING-HEADERS.
+000741             MOVE WS-DASH TO SCTH-MEMBER-U
+000742             MOVE WS-DASH TO SCTH-CODE-U
+000743             MOVE WS-DASH TO SCTH-PRODUCT-U
+000744             MOVE WS-DASH TO SCTH-PRICE-U
+000745             MOVE WS-DASH TO SCTH-QUANTITY-U
+000746             MOVE WS-DASH TO SCTH-METHOD-U
+000747             MOVE WS-DASH TO SCTH-FEE-U
+000748             MOVE WS-DASH TO SCTH-COST-U
+000749
+000750             MOVE WS-DASH TO SCRH-CODE-U
+000751             MOVE WS-DASH TO SCRH-PRODUCT-U
+000752             MOVE WS-DASH TO SCRH-PRICE-U
+000753             MOVE WS-DASH TO SCRH-QUANTITY-U
+000754             MOVE WS-DASH TO SCRH-COST-U
+000755         .
+000756
+000757         DISPLAY-SHIPPING-REPORT-HEADERS.
+000758        *    MOVE WS-DASH TO SCTH-MEMBER-U
+000759        *    MOVE WS-DASH TO SCTH-CODE-U
+000760        *    MOVE WS-DASH TO SCTH-PRODUCT-U
+000761        *    MOVE WS-DASH TO SCTH-PRICE-U
+000762        *    MOVE WS-DASH TO SCTH-QUANTITY-U
+000763        *    MOVE WS-DASH TO SCTH-METHOD-U
+000764        *    MOVE WS-DASH TO SCTH-FEE-U
+000765        *    MOVE WS-DASH TO SCTH-COST-U
+000766             PERFORM SETUP-SHIPPING-HEADERS
+000767
+000768             DISPLAY SCTH-CODE WS-GAP
+000769                     SCTH-PRODUCT WS-GAP
+000770                     SCTH-PRICE WS-GAP
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0016
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000771                     SCTH-QUANTITY WS-GAP
+000772                     SCTH-COST
+000773
+000774             DISPLAY SCTH-CODE-U WS-GAP
+000775                     SCTH-PRODUCT-U WS-GAP
+000776                     SCTH-PRICE-U WS-GAP
+000777                     SCTH-QUANTITY-U WS-GAP
+000778                     SCTH-COST-U
+000779         .
+000780
+000781        *    Display the shipping and dispatch report
+000782         DISPLAY-SHIPPING-REPORT.
+000783             SET SCR-IDX TO 1
+000784
+000785             PERFORM DISPLAY-SHIPPING-REPORT-HEADERS
+000786
+000787             PERFORM VARYING SCR-IDX FROM 1 BY 1
+000788                                             UNTIL SCR-IDX EQUAL SCR-IDXC
+000789               MOVE SCRI-CODE(SCR-IDX) TO SCRD-CODE
+000790               MOVE SCRI-PRODUCT(SCR-IDX) TO SCRD-PRODUCT
+000791               MOVE SCRI-PRICE(SCR-IDX) TO SCRD-PRICE
+000792               MOVE SCRI-QUANTITY(SCR-IDX) TO SCRD-QUANTITY
+000793               MOVE SCRI-COST(SCR-IDX) TO SCRD-COST
+000794
+000795               DISPLAY SCRD-CODE WS-GAP
+000796                       SCRD-PRODUCT WS-GAP
+000797                       SCRD-PRICE WS-GAP
+000798                       SCRD-QUANTITY WS-GAP
+000799                       SCRD-COST
+000800             END-PERFORM
+000801         .
+000802
+000803         WRITE-SHIPPING-REPORT.
+000804             SET SCR-IDX TO 1
+000805             PERFORM SETUP-SHIPPING-HEADERS
+000806
+000807             OPEN OUTPUT SHIP-REPORT-FILE.
+000808               WRITE SHIP-REPORT-HEADER FROM SHOPPING-CART-REPORT-HEADER
+000809               WRITE SHIP-REPORT-HEADER FROM SHOPPING-CART-REPORT-U-LINE
+000810
+000811               PERFORM VARYING SCR-IDX FROM 1 BY 1
+000812                                             UNTIL SCR-IDX EQUAL SCR-IDXC
+000813                 MOVE SCRI-CODE(SCR-IDX) TO SCRD-CODE
+000814                 MOVE SCRI-PRODUCT(SCR-IDX) TO SCRD-PRODUCT
+000815                 MOVE SCRI-PRICE(SCR-IDX) TO SCRD-PRICE
+000816                 MOVE SCRI-QUANTITY(SCR-IDX) TO SCRD-QUANTITY
+000817                 MOVE SCRI-COST(SCR-IDX) TO SCRD-COST
+000818
+000819                 WRITE SHIP-REPORT-RECORD FROM
+000820                       SHOPPING-CART-REPORT-DISPLAY
+000821
+000822               END-PERFORM
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0017
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000823             CLOSE SHIP-REPORT-FILE
+000824         .
+000825        *    *************************************************************
+000826        *
+000827        *    Build the product catalogue database from the product list and
+000828        *    the product price list
+000829        *
+000830        *    *************************************************************
+000831
+000832         BUILD-CATALOGUE-TABLE.
+000833             OPEN INPUT CSV-PRODUCT-FILE.
+000834             SET HWC-IDX TO 1
+000835             PERFORM UNTIL WS-EOF01 EQUAL 'Y'
+000836               READ CSV-PRODUCT-FILE
+000837                 AT END MOVE 'Y' TO WS-EOF01
+000838                 NOT AT END
+000839                   MOVE HWC-IDX TO HWC-IDXC
+000840                   MOVE HWC-IDXC TO HWC-CODE
+000841                   MOVE HWC-CODE TO PCT-CODE(HWC-IDX)
+000842                   UNSTRING CSV-PRODUCT-RECORD
+000843                     DELIMITED BY ','
+000844                     INTO
+000845                       PCT-PRODUCT(HWC-IDX)
+000846                       PCT-PRICE(HWC-IDX)
+000847                   SET HWC-IDX UP BY 1
+000848               END-READ
+000849             END-PERFORM.
+000850             CLOSE CSV-PRODUCT-FILE
+000851             MOVE 'N' TO WS-EOF01.
+000852
+000853        *    *************************************************************
+000854        *
+000855        *    Automate shopping cart processing
+000856        *
+000857        *    *************************************************************
+000858
+000859         PROCESS-SHOPPING-CART.
+000860             MOVE "N" TO WS-EOF01
+000861             MOVE "Y" TO WS-SILENT
+000862             SET ERR-IDX TO 1
+000863
+000864             OPEN INPUT CSV-SHOPPING-CART-FILE.
+000865             PERFORM UNTIL WS-EOF01 EQUAL 'Y'
+000866               READ CSV-SHOPPING-CART-FILE
+000867                 AT END MOVE 'Y' TO WS-EOF01
+000868                 NOT AT END
+000869                   UNSTRING CSV-SHOPPING-CART-RECORD
+000870                     DELIMITED BY "," INTO
+000871                       WS-MEMBER-RESP
+000872                       WS-PRODUCT-RESP
+000873                       WS-QUANT-RESP
+000874                       WS-DELIVERY
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0018
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000875
+000876        *    All of this needs to succeed for the next part to proceed
+000877        *    Any part fails, then it cannot proceed as an invalid choice
+000878        *    has occurred and need to be addressed.
+000879                   ADD 1 TO WS-CART-LINE
+000880                   PERFORM PROCESS-IS-MEMBER
+000881                   IF WS-RESP-OK EQUAL "Y" THEN
+000882                     PERFORM PROCESS-PRODUCT-CODE
+000883                     MOVE 'N' TO WS-DISP-ERR
+000884                     IF WS-RESP-OK EQUAL "Y" THEN
+000885                       PERFORM PROCESS-QUANTITY
+000886                       MOVE 'N' TO WS-DISP-ERR
+000887                       IF WS-RESP-OK EQUAL "Y" THEN
+000888                         PERFORM PROCESS-DELIVERY
+000889                         MOVE 'N' TO WS-DISP-ERR
+000890                         IF WS-RESP-OK EQUAL "Y" THEN
+000891                           PERFORM CALCULATE-SHIP-FEE
+000892                           PERFORM CALCULATE-COST
+000893                           PERFORM CONSOLIDATE-DATA-TO-TABLE-INDEXED
+000894                           MOVE 'N' TO WS-DISP-ERR
+000895                         ELSE
+000896                           MOVE 'Y' TO WS-DISP-ERR
+000897                           MOVE "DELIVERY" TO WS-DISP-MSG
+000898                         END-IF
+000899                       ELSE
+000900                         MOVE 'Y' TO WS-DISP-ERR
+000901                         MOVE "QUANTITY" TO WS-DISP-MSG
+000902                       END-IF
+000903                     ELSE
+000904                       MOVE 'Y' TO WS-DISP-ERR
+000905                       MOVE "CODE" TO WS-DISP-MSG
+000906                     END-IF
+000907                   ELSE
+000908                     MOVE 'Y' TO WS-DISP-ERR
+000909                     MOVE "MEMBER" TO WS-DISP-MSG
+000910                   END-IF
+000911        *          MOVE 'Y' TO WS-RESP-OK
+000912                   IF WS-DISP-ERR EQUAL "Y" THEN
+000913                     ADD 1 TO WS-ERRORS
+000914                     MOVE WS-CART-LINE TO EL-LINE(ERR-IDX)
+000915                     MOVE WS-DISP-MSG TO EL-MESSAGE(ERR-IDX)
+000916                     SET ERR-IDX UP BY 1
+000917                   END-IF
+000918               END-READ
+000919             END-PERFORM
+000920             CLOSE CSV-SHOPPING-CART-FILE
+000921             MOVE 'N' TO WS-EOF01
+000922         .
+000923
+000924        *    *************************************************************
+000925        *
+000926        *    Display the catalogue formatted in two columns with
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0019
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000927        *    headers and decorators
+000928        *
+000929        *    *************************************************************
+000930
+000931         DISPLAY-CATALOGUE.
+000932             PERFORM DISPLAY-CATALOGUE-HEADERS
+000933             SET HWC-IDX TO 1
+000934             MOVE 0 TO WS-COLS
+000935
+000936             PERFORM VARYING HWC-IDX FROM 1 BY 1
+000937                                     UNTIL HWC-IDX GREATER HWC-IDXC
+000938               MOVE PCT-CODE(HWC-IDX) TO PCD-CODE
+000939               MOVE PCT-PRODUCT(HWC-IDX) TO PCD-PRODUCT
+000940               MOVE PCT-PRICE(HWC-IDX) TO PCD-PRICE
+000941               IF WS-COLS EQUAL 0 THEN
+000942                 DISPLAY PCD-CODE WS-GAP
+000943                         PCD-PRODUCT WS-GAP
+000944                         PCD-PRICE WS-GAP
+000945                         WITH NO ADVANCING
+000946               ELSE
+000947                 DISPLAY PCD-CODE WS-GAP
+000948                         PCD-PRODUCT WS-GAP
+000949                         PCD-PRICE WS-GAP
+000950               END-IF
+000951
+000952               ADD 1 TO WS-COLS
+000953               IF WS-COLS EQUAL 2 THEN
+000954                 MOVE 0 TO WS-COLS
+000955               END-IF
+000956
+000957             END-PERFORM.
+000958
+000959        *    *************************************************************
+000960        *
+000961        *    Generate the headers for the product catalogue table
+000962        *
+000963        *    *************************************************************
+000964
+000965         DISPLAY-CATALOGUE-HEADERS.
+000966             MOVE 0 TO WS-COLS
+000967             PERFORM UNTIL WS-COLS EQUAL 2
+000968               IF WS-COLS EQUAL 0 THEN
+000969                 DISPLAY
+000970                   PCH-CODE WS-GAP
+000971                   PCH-PROD WS-GAP
+000972                   PCH-PRICE WS-GAP
+000973                   WITH NO ADVANCING
+000974               ELSE
+000975                 DISPLAY
+000976                   PCH-CODE WS-GAP
+000977                   PCH-PROD WS-GAP
+000978                   PCH-PRICE WS-GAP
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0020
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000979               END-IF
+000980               ADD 1 TO WS-COLS
+000981             END-PERFORM
+000982             MOVE 0 TO WS-COLS
+000983
+000984             MOVE WS-DASH TO PCH-CODE-U-LINE
+000985             MOVE WS-DASH TO PCH-PROD-U-LINE
+000986             MOVE WS-DASH TO PCH-PRICE-U-LINE
+000987
+000988             PERFORM UNTIL WS-COLS EQUAL 2
+000989               IF WS-COLS EQUAL 0 THEN
+000990                 DISPLAY PCH-CODE-U-LINE WS-GAP
+000991                         PCH-PROD-U-LINE WS-GAP
+000992                         PCH-PRICE-U-LINE WS-GAP
+000993                         WITH NO ADVANCING
+000994               ELSE
+000995                 DISPLAY PCH-CODE-U-LINE WS-GAP
+000996                         PCH-PROD-U-LINE WS-GAP
+000997                         PCH-PRICE-U-LINE WS-GAP
+000998               END-IF
+000999               ADD 1 TO WS-COLS
+001000             END-PERFORM
+001001             MOVE 0 TO WS-COLS.
+001002
+001003         COPY "MEMBER".
+000001C       *    *************************************************************
+000002C       *
+000003C       *    Functions and methods to query if the customer is a member
+000004C       *    and to validate the response from the user
+000005C       *
+000006C       *    *************************************************************
+000007C
+000008C        QUERY-IS-MEMBER.
+000009C            MOVE SPACE TO WS-MEMBER-RESP
+000010C            MOVE "N" TO WS-RESP-OK
+000011C
+000012C            PERFORM UNTIL WS-RESP-OK = 'Y'
+000013C              DISPLAY "IS THE CUSTOMER A MEMBER? (YES/NO/END): "
+000014C                WITH NO ADVANCING
+000015C              ACCEPT WS-MEMBER-RESP
+000016C              PERFORM VALIDATE-MEMBER
+000017C            END-PERFORM
+000018C            MOVE "N" TO WS-RESP-OK.
+000019C
+000020C       *    *************************************************************
+000021C       *
+000022C       *    Validate that the entered response is correct and notify the
+000023C       *    user with a response if it is not
+000024C       *
+000025C       *    *************************************************************
+000026C
+000027C        PROCESS-IS-MEMBER.
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0021
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000028C            MOVE 'N' TO WS-RESP-OK
+000029C
+000030C            PERFORM VALIDATE-MEMBER
+000031C        .
+000032C
+000033C       *    Validate whether the response is valid or not
+000034C        VALIDATE-MEMBER.
+000035C            EVALUATE WS-MEMBER-RESP
+000036C              WHEN "YES"
+000037C                MOVE 'Y' TO WS-RESP-OK
+000038C              WHEN "NO"
+000039C                MOVE 'Y' TO WS-RESP-OK
+000040C              WHEN "END"
+000041C                MOVE 'Y' TO WS-RESP-OK
+000042C              WHEN OTHER
+000043C                MOVE 'N' TO WS-RESP-OK
+000044C                IF WS-SILENT EQUAL "N"
+000045C                  DISPLAY "INVALID INPUT: 'YES/NO/END' ONLY."
+000046C                END-IF
+000047C            END-EVALUATE.
+001004
+001005         COPY "PCODE".
+000001C       *    *************************************************************
+000002C       *
+000003C       *    Functions and methods to query to query the product code
+000004C       *    and to validate the response from the user
+000005C       *
+000006C       *    *************************************************************
+000007C
+000008C        QUERY-PRODUCT-CODE.
+000009C            MOVE 'N' TO WS-RESP-OK
+000010C            MOVE 0 TO WS-PRODUCT-NUM
+000011C            MOVE SPACES TO WS-PRODUCT-RESP
+000012C
+000013C            PERFORM UNTIL WS-RESP-OK EQUAL 'Y'
+000014C              DISPLAY "SELECT A PRODUCT (1-40): "
+000015C                WITH NO ADVANCING
+000016C              ACCEPT WS-PRODUCT-RESP
+000017C              COMPUTE WS-PRODUCT-NUM = FUNCTION NUMVAL (WS-PRODUCT-RESP)
+000018C              PERFORM VALIDATE-PRODUCT-CODE
+000019C            END-PERFORM
+000020C            MOVE "N" TO WS-RESP-OK
+000021C            MOVE SPACES TO WS-PRODUCT-RESP.
+000022C
+000023C       *    *************************************************************
+000024C       *
+000025C       *    Validate the product code entered is within the predefined
+000026C       *    range, otherwise notify the user with an appropriate message
+000027C       *
+000028C       *    *************************************************************
+000029C
+000030C        PROCESS-PRODUCT-CODE.
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0022
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000031C            MOVE 'N' TO WS-RESP-OK
+000032C
+000033C            COMPUTE WS-PRODUCT-NUM = FUNCTION NUMVAL(WS-PRODUCT-RESP)
+000034C            PERFORM VALIDATE-PRODUCT-CODE
+000035C            IF WS-RESP-OK EQUAL "Y" THEN
+000036C              PERFORM SEARCH-PRODUCT-CODE
+000037C            END-IF
+000038C        .
+000039C
+000040C       *    Ensure that the product code is between the ranges of
+000041C       *    1 and 40
+000042C        VALIDATE-PRODUCT-CODE.
+000043C            EVALUATE TRUE
+000044C              WHEN WS-PRODUCT-NUM GREATER 0 AND WS-PRODUCT-NUM LESS 41
+000045C                MOVE "Y" TO WS-RESP-OK
+000046C              WHEN OTHER
+000047C                MOVE "N" TO WS-RESP-OK
+000048C                IF WS-SILENT EQUAL 'N'
+000049C                 DISPLAY "INVALID INPUT: '1-40' ONLY."
+000050C                END-IF
+000051C            END-EVALUATE.
+000052C
+000053C       *    *************************************************************
+000054C       *
+000055C       *    Execute the search of the table for the desired product.
+000056C       *    COBOL has a dedicated SEARCH function, but as the table is
+000057C       *    not using an actual INDEX which would require the use of SET
+000058C       *    rather than MOVE/ADD PERFORM loops are used instead.
+000059C       *
+000060C       *    *************************************************************
+000061C
+000062C        SEARCH-PRODUCT-CODE.
+000063C            SET HWC-IDX TO 1
+000064C            SEARCH PRODUCT-CATALOGUE-TABLE
+000065C              AT END
+000066C                DISPLAY "ITEM NOT FOUND"
+000067C              WHEN PCT-CODE(HWC-IDX) EQUAL WS-PRODUCT-NUM
+000068C                MOVE PCT-CODE(HWC-IDX) TO WS-PRODUCT-CODE
+000069C                MOVE PCT-PRODUCT(HWC-IDX) TO WS-PRODUCT-DESC
+000070C                MOVE PCT-PRICE(HWC-IDX) TO WS-PRODUCT-PRICE
+000071C            END-SEARCH
+000072C            .
+001006
+001007         COPY "QUANTITY".
+000001C       *    *************************************************************
+000002C       *
+000003C       *    Functions and methods to query to query the quantity
+000004C       *    and to validate the response from the user
+000005C       *
+000006C       *    *************************************************************
+000007C
+000008C        QUERY-QUANTITY.
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0023
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000009C            MOVE 'N' TO WS-RESP-OK
+000010C            MOVE SPACES TO WS-QUANT-RESP
+000011C            MOVE 0 TO WS-QUANT-NUM
+000012C
+000013C            PERFORM UNTIL WS-RESP-OK EQUAL 'Y'
+000014C              DISPLAY "HOW MANY ITEMS TO DISPLAY? (1-29): "
+000015C                WITH NO ADVANCING
+000016C                ACCEPT WS-QUANT-RESP
+000017C                COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
+000018C                PERFORM VALIDATE-QUANTITY
+000019C            END-PERFORM.
+000020C
+000021C       *    *************************************************************
+000022C       *
+000023C       *    Validate that the quantity entered is within the predefined
+000024C       *    range, and if it is not notify the user
+000025C       *
+000026C       *    *************************************************************
+000027C
+000028C        PROCESS-QUANTITY.
+000029C            MOVE 'N' TO WS-RESP-OK
+000030C
+000031C            COMPUTE WS-QUANT-NUM = FUNCTION NUMVAL(WS-QUANT-RESP)
+000032C            PERFORM VALIDATE-QUANTITY
+000033C        .
+000034C
+000035C       *    Ensure that the quantity is between the ranges of 1 and 29
+000036C        VALIDATE-QUANTITY.
+000037C            EVALUATE TRUE
+000038C             WHEN WS-QUANT-NUM GREATER 0 AND LESS 30
+000039C               MOVE 'Y' TO WS-RESP-OK
+000040C             WHEN OTHER
+000041C               MOVE "N" TO WS-RESP-OK
+000042C               IF WS-SILENT EQUAL 'N' THEN
+000043C                 DISPLAY "INVALID QUANTITY BETWEEN 1 AND 29 INCLUSIVELY."
+000044C               END-IF
+000045C            END-EVALUATE.
+001008
+001009         COPY "DELIVERY".
+000001C       *    *************************************************************
+000002C       *
+000003C       *    Functions and methods to query to query the delivery method
+000004C       *    and to validate the response from the user
+000005C       *
+000006C       *    *************************************************************
+000007C
+000008C        QUERY-DELIVERY-METHOD.
+000009C            MOVE "N" TO WS-RESP-OK
+000010C            MOVE SPACES TO WS-DELIVERY
+000011C
+000012C            PERFORM UNTIL WS-RESP-OK EQUAL "Y"
+000013C              DISPLAY "DELIVERY METHOD? (DELIVERY/PICK-UP): "
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0024
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000014C                WITH NO ADVANCING
+000015C              ACCEPT WS-DELIVERY
+000016C              PERFORM VALIDATE-DELIVERY-METHOD
+000017C              PERFORM PROCESS-DELIVERY-METHOD
+000018C            END-PERFORM
+000019C            MOVE "N" TO WS-RESP-OK.
+000020C
+000021C       *    *************************************************************
+000022C       *
+000023C       *    Validate the delivery methods that the user has entered,
+000024C       *    if they have entered in an invalid choice, notify them
+000025C       *
+000026C       *    *************************************************************
+000027C
+000028C        PROCESS-DELIVERY.
+000029C            MOVE 'N' TO WS-RESP-OK
+000030C            PERFORM VALIDATE-DELIVERY-METHOD
+000031C       *    PERFORM PROCESS-DELIVERY-METHOD
+000032C        .
+000033C
+000034C       *    Validate that the appropriate delivery method is chosen
+000035C        VALIDATE-DELIVERY-METHOD.
+000036C            EVALUATE WS-DELIVERY
+000037C              WHEN WS-DEL
+000038C                MOVE "Y" TO WS-RESP-OK
+000039C              WHEN WS-PU
+000040C                MOVE "Y" TO WS-RESP-OK
+000041C              WHEN OTHER
+000042C                IF WS-SILENT EQUAL "N" THEN
+000043C                  DISPLAY "INVALID DELIVERY METHOD. "
+000044C                          "CHOOSE 'DELIVERY' OR 'PICK-UP'."
+000045C                END-IF
+000046C            END-EVALUATE.
+000047C
+000048C       *    This is used to determine the what type of delivery method
+000049C       *    was used for calculations
+000050C        PROCESS-DELIVERY-METHOD.
+000051C            MOVE 0 TO WS-DELIVERY-NUM
+000052C            IF WS-DELIVERY EQUAL WS-DEL THEN
+000053C              MOVE 1 TO WS-DELIVERY-NUM
+000054C            IF WS-DELIVERY EQUAL WS-PU THEN
+000055C              MOVE 2 TO WS-DELIVERY-NUM
+000056C            END-IF.
+000057C
+001010
+001011        *    *************************************************************
+001012        *
+001013        *    Functions and methods to calculate shipping and costs
+001014        *
+001015        *    *************************************************************
+001016
+001017        *    Calculate shipping fee based on what delivery method used,
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0025
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+001018        *    quantity, and if the base rate is the only factor or if the
+001019        *    base and subsequent item fee applies.
+001020         CALCULATE-SHIP-FEE.
+001021             MOVE 0 TO WS-SHIP-FEE
+001022
+001023             IF WS-DELIVERY EQUAL WS-DEL THEN
+001024               IF WS-QUANT-NUM GREATER THAN 1 THEN
+001025                 COMPUTE WS-SHIP-FEE = 2.00 +
+001026                         (( WS-QUANT-NUM - 1 ) * 1.60)
+001027               ELSE
+001028                 MOVE 2.00 TO WS-SHIP-FEE
+001029               END-IF
+001030             END-IF.
+001031
+001032        *    Calculate the cost using the above shipping fee added to the
+001033        *    quantity multiplied by the price.  Then if the customer is a
+001034        *    member, apply a discount.
+001035         CALCULATE-COST.
+001036             MOVE 0 TO WS-COST
+001037
+001038             COMPUTE WS-COST = (WS-QUANT-NUM * WS-PRODUCT-PRICE) +
+001039                                WS-SHIP-FEE
+001040
+001041             IF WS-MEMBER-RESP EQUAL "YES" THEN
+001042               COMPUTE WS-COST = WS-COST * (90 / 100)
+001043             END-IF.
+001044
+001045         COPY "SORTCODE".
+000001C       *    *************************************************************
+000002C       *
+000003C       *    Functions and methods to perform Bubble sort
+000004C       *    This is based loosely on the W3 School Python version
+000005C       *
+000006C       *    *************************************************************
+000007C
+000008C        SORT-TABLE.
+000009C            PERFORM VARYING I FROM 1 BY 1 UNTIL I EQUAL SCT-IDXC
+000010C              PERFORM VARYING J FROM I BY 1 UNTIL J EQUAL SCT-IDXC
+000011C                IF SCTI-CODE(I) > SCTI-CODE(J)
+000012C                  PERFORM SWAP-RECORD
+000013C                END-IF
+000014C              END-PERFORM
+000015C            END-PERFORM
+000016C        .
+000017C
+000018C       *    Swap the records around using a temporary table.
+000019C        SWAP-RECORD.
+000020C            MOVE SHOPPING-CART-TABLE-INDEXED(I) TO TEMP-CART
+000021C            MOVE SHOPPING-CART-TABLE-INDEXED(J) TO
+000022C                 SHOPPING-CART-TABLE-INDEXED(I)
+000023C            MOVE TEMP-CART TO SHOPPING-CART-TABLE-INDEXED(J)
+000024C        .
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0026
+
+LINE    PG/LN  A...B............................................................SEQUENCE
+
+000025C
+001046
+001047         COPY "CPSORT".
+000001C       *    *************************************************************
+000002C       *
+000003C       *    I asked Copilot for help as I was losing the first record.
+000004C       *    I did not realise I was iterating beyond the indexed bounds
+000005C       *    which meant that 0 was possible and this was being added to
+000006C       *    to the table.  Copilot also suggested a fix to stop self
+000007C       *    referencing the first element and this is what it came up
+000008C       *    with.  I kept it separate from my code as it is not my work.
+000009C       *
+000010C       *    *************************************************************
+000011C
+000012C        COPILOT-SORT-TABLE.
+000013C            PERFORM VARYING I FROM 1 BY 1 UNTIL I >= SCT-IDXC - 1
+000014C              PERFORM VARYING J FROM 1 BY 1 UNTIL J >= SCT-IDXC - I
+000015C                IF SCTI-CODE(J) > SCTI-CODE(J + 1)
+000016C                  PERFORM COPILOT-SWAP-RECORD
+000017C                END-IF
+000018C              END-PERFORM
+000019C            END-PERFORM
+000020C        .
+000021C
+000022C        COPILOT-SWAP-RECORD.
+000023C            MOVE SHOPPING-CART-TABLE-INDEXED(J) TO TEMP-CART
+000024C            MOVE SHOPPING-CART-TABLE-INDEXED(J + 1) TO
+000025C                 SHOPPING-CART-TABLE-INDEXED(J)
+000026C            MOVE TEMP-CART TO SHOPPING-CART-TABLE-INDEXED(J + 1)
+000027C        .
+001048
+001049
+001050
+001051
+001052
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0027
+
+NAME                           DEFINED                                    REFERENCES
+
+CSV-PRODUCT-FILE               10       39      833     836     850                                            x4
+CSV-PRODUCT-RECORD             41       842                                                                    x1
+
+CSV-SHOPPING-CART-FILE         14       44      864     866     920                                            x4
+CSV-SHOPPING-CART-RECORD       46       869                                                                    x1
+
+SHOPCART-REPORT-FILE           18       48     *643    *644    *645    *659    *663     666                    x7
+SHOPCART-HEADERS               49      *644    *645                                                            x2
+SCH-MEMBER                     50     referenced by parent
+SCH-CODE                       52     referenced by parent
+SCH-PRODUCT                    54     referenced by parent
+SCH-PRICE                      56     referenced by parent
+SCH-QUANTITY                   58     referenced by parent
+SCH-METHOD                     60     referenced by parent
+SCH-FEE                        62     referenced by parent
+SCH-COST                       64     referenced by parent
+SHOPCART-REPORT                66      *659                                                                    x1
+SCR-MEMBER                     67     referenced by parent
+SCR-CODE                       69     referenced by parent
+SCR-PRODUCT                    71     referenced by parent
+SCR-PRICE                      73     referenced by parent
+SCR-QUANTITY                   75     referenced by parent
+SCR-METHOD                     77     referenced by parent
+SCR-FEE                        79     referenced by parent
+SCR-COST                       81     referenced by parent
+SHOPCART-REPORT-TOTAL          84      *663                                                                    x1
+SCR-TOTAL                      86     referenced by parent
+
+SHIP-REPORT-FILE               22       88     *807    *808    *809    *819     823                            x6
+SHIP-REPORT-HEADER             89      *808    *809                                                            x2
+SRH-CODE                       90     referenced by parent
+SRH-PRODUCT                    92     referenced by parent
+SRH-PRICE                      94     referenced by parent
+SRH-QUANTITY                   96     referenced by parent
+SRH-COST                       98     referenced by parent
+SHIP-REPORT-RECORD             100     *819                                                                    x1
+SRR-CODE                       101    referenced by parent
+SRR-PRODUCT                    103    referenced by parent
+SRR-PRICE                      105    referenced by parent
+SRR-QUANTITY                   107    referenced by parent
+SRR-COST                       109    referenced by parent
+
+ERROR-REPORT-FILE              26       111    *503    *510     513                                            x4
+ERROR-REPORT-RECORD            112     *510                                                                    x1
+ERR-MESSAGE                    113    referenced by parent
+ERR-LINE                       115    referenced by parent
+
+WS-EOF01                       128      835    *837    *851    *860     865    *867    *921                    x7
+WS-EOF02                       129    not referenced
+I                              8        9       10      11      14      13      13      20      22             x8
+J                              9        10      11      15      15      14      14      21      23      24      25
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0028
+
+NAME                           DEFINED                                    REFERENCES
+
+                                        26                                                                     x11
+WS-GAP                         138      582     583     584     585     586     587     588     591     592     593
+                                        594     595     596     597     619     620     621     622     623     624
+                                        625     768     769     770     771     774     775     776     777     795
+                                        796     797     798     942     943     944     947     948     949     970
+                                        971     972     976     977     978     990     991     992     995     996
+                                        997                                                                    x51
+WS-COLS                        142     *934     941    *952     953    *954    *966     967     968    *980    *982
+                                        988     989    *999    *1001                                           x14
+WS-MAX                         144      550                                                                    x1
+WS-DASH                        146      561     562     563     564     565     566     567     568     741     742
+                                        743     744     745     746     747     748     750     751     752     753
+                                        754     984     985     986                                            x24
+WS-DELIVERY-METHODS            150    referenced by child
+WS-DEL                         151      37      52      1023                                                   x3
+WS-PU                          152      39      54                                                             x2
+WS-REQUIRED-VARIABLES          159    referenced by child
+WS-CART-LINE                   161     *879     914                                                            x2
+WS-DISP-ERR                    163     *883    *886    *889    *894    *896    *900    *904    *908     912    x9
+WS-DISP-MSG                    165     *897    *901    *905    *909     915                                    x5
+WS-RESP-OK                     167     *9      *10     *40     *40     *40      40     *38     *38     *38      38
+                                       *29     *29     *29      29     *19     *19     *19      19      12     *41
+                                       *41     *41      41     *39     *39     *39      39     *29     *29     *29
+                                        29      13     *47     *47     *47      47     *45     *45     *45      45
+                                        35     *31     *31     *31      31     *20     *20     *20      20      13
+                                       *43     *43     *43      43     *41     *41     *41      41     *39     *39
+                                       *39      39     *37     *37     *37      37     *28     *28     *28      28
+                                       *18     *18     *18      18      12      881     884     887     890    x79
+WS-SILENT                      169      42      44      48     *861                                            x4
+WS-MEMBER-RESP                 171     *9       35     *15      15      448     450     535     871     1041   x9
+WS-PRODUCT-RESP                173     *11      33     *21     *21     *21      21      17     *16      16      872
+                                                                                                               x10
+WS-PRODUCT-NUM                 175     *10     *17     *33      44      67                                     x5
+WS-PRODUCT-CODE                177     *68      536                                                            x2
+WS-PRODUCT-DESC                179     *69      537                                                            x2
+WS-PRODUCT-PRICE               181     *70      538     1038                                                   x3
+WS-QUANT-RESP                  183     *10      31      17     *16      16      873                            x6
+WS-QUANT-NUM                   185     *11      38     *31      31     *17      17      539     1024    1026    1038
+                                                                                                               x10
+WS-DELIVERY                    187     *10      54      52      36     *15      15      540     874     1023   x9
+WS-DELIVERY-NUM                189     *51     *53     *55                                                     x3
+WS-SHIP-FEE                    191      541    *1021   *1025   *1028    1039                                   x5
+WS-COST                        193      542    *1036   *1038   *1042                                           x4
+WS-TOTAL-COST                  195     *603    *617     630    *640    *656     662                            x6
+WS-FOUND                       198     *678    *692     697    *705    *715     719    *726     730            x8
+WS-REPORT-Q                    200     *685     689                                                            x2
+WS-REPORT-C                    202     *687     690                                                            x2
+WS-ERRORS                      204      491     494     506    *913                                            x4
+WS-INTERACT-RESP               206    not referenced
+HOMEWARECITY-STORAGE           214    referenced by child
+HWC-IDXC                       216     *839     840     937                                                    x3
+HWC-CODE                       218     *840     841                                                            x2
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0029
+
+NAME                           DEFINED                                    REFERENCES
+
+SCT-INDEX                      220     *445                                                                    x1
+SCT-COUNT                      222    not referenced
+SCT-IDXC                       224      9       14      13      10     *545     548     549     608     647     681
+                                        714                                                                    x11
+SCR-IDXC                       226     *677     683    *703    *711     718    *736     788     812            x8
+ERROR-LOG                      236    referenced by child
+EL-MESSAGE                     237      498     508    *915                                                    x3
+EL-LINE                        239      496     507    *914                                                    x3
+ERROR-LOG-DISPLAY              241      510                                                                    x1
+ERD-MESSAGE                    242     *508                                                                    x1
+ERD-LINE                       244     *507                                                                    x1
+PRODUCT-CATALOGUE-TABLE        252      64                                                                     x1
+PCT-CODE                       254      67      68     *841     938                                            x4
+PCT-PRODUCT                    255      69      845     939                                                    x3
+PCT-PRICE                      256      70      846     940                                                    x3
+PRODUCT-CATALOGUE-DISPLAY      259    referenced by child
+PCD-CODE                       260     *938     942     947                                                    x3
+PCD-PRODUCT                    261     *939     943     948                                                    x3
+PCD-PRICE                      262     *940     944     949                                                    x3
+PRODUCT-CATALOGUE-HEADERS      265    referenced by child
+PCH-CODE                       266      970     976                                                            x2
+PCH-PROD                       267      971     977                                                            x2
+PCH-PRICE                      268      972     978                                                            x2
+PCH-CODE-U-LINE                269     *984     990     995                                                    x3
+PCH-PROD-U-LINE                270     *985     991     996                                                    x3
+PCH-PRICE-U-LINE               271     *986     992     997                                                    x3
+SHOPPING-CART-TABLE-INDEXED    280      20      21     *22     *23      24     *25     *26                     x7
+SCTI-MEMBER                    283     *535     609     648                                                    x3
+SCTI-CODE                      284      11      15      15      281    *536     610     649     684     698     721
+                                        731                                                                    x11
+SCTI-PRODUCT                   285     *537     611     650     699     732                                    x5
+SCTI-PRICE                     286     *538     612     651     700     733                                    x5
+SCTI-QUANTITY                  287     *539     613     652     686     701     723     734                    x7
+SCTI-METHOD                    288     *540     614     653                                                    x3
+SCTI-FEE                       289     *541     615     654                                                    x3
+SCTI-COST                      290     *542     616     617     655     657     688     702     725     735    x9
+SHOPPING-CART-TABLE-HEADERS    293      644                                                                    x1
+SCTH-MEMBER                    294      582                                                                    x1
+SCTH-CODE                      296      583     768                                                            x2
+SCTH-PRODUCT                   298      584     769                                                            x2
+SCTH-PRICE                     300      585     770                                                            x2
+SCTH-QUANTITY                  302      586     771                                                            x2
+SCTH-METHOD                    304      587                                                                    x1
+SCTH-FEE                       306      588                                                                    x1
+SCTH-COST                      308      589     772                                                            x2
+SHOPPING-CART-TABLE-U-LINE     310      645                                                                    x1
+SCTH-MEMBER-U                  311     *561     591    *741                                                    x3
+SCTH-CODE-U                    313     *562     592    *742     774                                            x4
+SCTH-PRODUCT-U                 315     *563     593    *743     775                                            x4
+SCTH-PRICE-U                   317     *564     594    *744     776                                            x4
+SCTH-QUANTITY-U                319     *565     595    *745     777                                            x4
+SCTH-METHOD-U                  321     *566     596    *746                                                    x3
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0030
+
+NAME                           DEFINED                                    REFERENCES
+
+SCTH-FEE-U                     323     *567     597    *747                                                    x3
+SCTH-COST-U                    325     *568     598    *748     778                                            x4
+SHOPPING-CART-TABLE-DISPLAY    328      659                                                                    x1
+SCTD-MEMBER                    329     *609     619    *648                                                    x3
+SCTD-CODE                      331     *610     620    *649                                                    x3
+SCTD-PRODUCT                   333     *611     621    *650                                                    x3
+SCTD-PRICE                     335     *612     622    *651                                                    x3
+SCTD-QUANTITY                  337     *613     623    *652                                                    x3
+SCTD-METHOD                    339     *614     624    *653                                                    x3
+SCTD-FEE                       341     *615     625    *654                                                    x3
+SCTD-COST                      343     *616     626    *655                                                    x3
+SHOPPING-CART-TOTAL-DISPLAY    345      664                                                                    x1
+SCTD-TOTAL                     347     *630     631    *662                                                    x3
+TEMP-CART                      350     *20     *23      26                                                     x3
+SHOPPING-CART-REPORT-INDEX     367    referenced by child
+SCRI-CODE                      369      684    *698     721    *731     789     813                            x6
+SCRI-PRODUCT                   370     *699    *732     790     814                                            x4
+SCRI-PRICE                     371     *700    *733     791     815                                            x4
+SCRI-QUANTITY                  372      685    *689    *701    *722     723    *734     792     816            x8
+SCRI-COST                      373      687    *690    *702    *724     725    *735     793     817            x8
+SHOPPING-CART-REPORT-DISPLAY   375      820                                                                    x1
+SCRD-CODE                      376     *789     795    *813                                                    x3
+SCRD-PRODUCT                   378     *790     796    *814                                                    x3
+SCRD-PRICE                     380     *791     797    *815                                                    x3
+SCRD-QUANTITY                  382     *792     798    *816                                                    x3
+SCRD-COST                      384     *793     799    *817                                                    x3
+SHOPPING-CART-REPORT-HEADER    386      808                                                                    x1
+SCRH-CODE                      387    referenced by parent
+SCRH-PRODUCT                   389    referenced by parent
+SCRH-PRICE                     391    referenced by parent
+SCRH-QUANTITY                  393    referenced by parent
+SCRH-COST                      395    referenced by parent
+SHOPPING-CART-REPORT-U-LINE    397      809                                                                    x1
+SCRH-CODE-U                    398     *750                                                                    x1
+SCRH-PRODUCT-U                 400     *751                                                                    x1
+SCRH-PRICE-U                   402     *752                                                                    x1
+SCRH-QUANTITY-U                404     *753                                                                    x1
+SCRH-COST-U                    406     *754                                                                    x1
+
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0031
+
+LABEL                          DEFINED                                    REFERENCES
+
+E SHOP__CART                   416
+P QUERY-USER-VERSION           442    not referenced
+P QUERY-NON-INTERACTIVE-VERSIO 476    not referenced
+P WRITE-ERROR-REPORT           502      522                                                                    x1
+P QUERY-WRITE-DATASETS         516      419                                                                    x1
+P CONSOLIDATE-DATA-TO-TABLE-IN 534      459     893                                                            x2
+P SETUP-HEADERS                560      580     641                                                            x2
+P DISPLAY-SHOPPING-CART-HEADER 571      605                                                                    x1
+P DISPLAY-CONSOLIDATED-DATA-TA 602      463     480                                                            x2
+P WRITE-CONSOLIDATED-DATA      639      518                                                                    x1
+P GENERATE-SHIPPING-REPORT     676      466     486     520                                                    x3
+P GENERATE-SHIPPING-REPORT-ORG 710    not referenced
+P SETUP-SHIPPING-HEADERS       740      766     805                                                            x2
+P DISPLAY-SHIPPING-REPORT-HEAD 757      785                                                                    x1
+P DISPLAY-SHIPPING-REPORT      782      467     487                                                            x2
+P WRITE-SHIPPING-REPORT        803      521                                                                    x1
+P BUILD-CATALOGUE-TABLE        832      416                                                                    x1
+P PROCESS-SHOPPING-CART        859      477     517                                                            x2
+P DISPLAY-CATALOGUE            931      451                                                                    x1
+P DISPLAY-CATALOGUE-HEADERS    965      932                                                                    x1
+P QUERY-IS-MEMBER              8        449                                                                    x1
+P PROCESS-IS-MEMBER            27       880                                                                    x1
+P VALIDATE-MEMBER              34       16      30                                                             x2
+P QUERY-PRODUCT-CODE           8        452                                                                    x1
+P PROCESS-PRODUCT-CODE         30       882                                                                    x1
+P VALIDATE-PRODUCT-CODE        42       18      34                                                             x2
+P SEARCH-PRODUCT-CODE          62       36      453                                                            x2
+P QUERY-QUANTITY               8        454                                                                    x1
+P PROCESS-QUANTITY             28       885                                                                    x1
+P VALIDATE-QUANTITY            36       18      32                                                             x2
+P QUERY-DELIVERY-METHOD        8        455                                                                    x1
+P PROCESS-DELIVERY             28       888                                                                    x1
+P VALIDATE-DELIVERY-METHOD     35       16      30                                                             x2
+P PROCESS-DELIVERY-METHOD      50       17                                                                     x1
+P CALCULATE-SHIP-FEE           1020     456     891                                                            x2
+P CALCULATE-COST               1035     457     892                                                            x2
+P SORT-TABLE                   8        465     485     519                                                    x3
+P SWAP-RECORD                  19       12                                                                     x1
+P COPILOT-SORT-TABLE           12     not referenced
+P COPILOT-SWAP-RECORD          22       16                                                                     x1
+
+GnuCOBOL 3.2.0          shopcart.cob                                                  Sat Jun 27 2026 17:08:12  Page 0032
+
+Error/Warning summary:
+
+shopcart.cob:3: warning: AUTHOR is obsolete in GnuCOBOL
+
+1 warning in compilation group
+0 errors in compilation group
